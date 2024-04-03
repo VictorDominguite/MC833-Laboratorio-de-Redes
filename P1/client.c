@@ -14,8 +14,8 @@
 #include <netdb.h>
 
 #define SERVERPORT "4952"    // the port users will be connecting to
-#define MAXBUFLEN 100
-#define HOSTNAME "tobias-desktop"
+#define MAXBUFLEN 1000
+#define HOSTNAME "snake.lab.ic.unicamp.br"
 
 
 int service(char *buf)
@@ -74,7 +74,7 @@ int service(char *buf)
 
 int main(){
     printf(
-        "Welcome to Tobify!\n\n"
+        "Welcome!\n\n"
         "What would you like to do?\n"
         "\t1. Register a new song\n"
         "\t2. Remove a song\n"
@@ -90,6 +90,9 @@ int main(){
     scanf(" %c", &option);
 
     char buf[MAXBUFLEN] = {option, '/', '\0'};
+    char year[5];
+    char language[MAXBUFLEN];
+    char song_name[MAXBUFLEN];
 
     switch (option)
     {
@@ -100,25 +103,45 @@ int main(){
         break;
         
     case '3':
-        printf("Boa escolha tigrao!\n");
-        char year[5];
         printf("Type the desired year: ");
-        scanf("%s", year);
+        scanf(" %s", year);
         strcat(buf, year);
-        strcat(buf, "/\0");
+
         service(buf);
         break;
 
     case '4':
+        printf("Type the desired year: ");
+        scanf("%s", year);
+        strcat(buf, year);
+        strcat(buf, "/");
+
+        printf("Type the desired language: ");
+        scanf("%s", language);
+        strcat(buf, language);
+
+        service(buf);
         break;
     
     case '5':
+        char genre[MAXBUFLEN];
+        printf("Type the desired genre: ");
+        scanf("%s", genre);
+        strcat(buf, genre);
+
+        service(buf);
         break;
     
     case '6':
+        printf("Type the name of the song: ");
+        scanf("\n%[^\n]%*c", song_name);
+        strcat(buf, song_name);
+
+        service(buf);
         break;
     
     case '7':
+        service(buf);
         break;
 
     default:
