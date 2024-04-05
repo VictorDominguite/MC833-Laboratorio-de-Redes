@@ -19,19 +19,7 @@
 #define MAXBUFLEN 1000
 
 
-cJSON* read_json() {
-    FILE *fp = fopen("example.json", "r"); 
-    if (fp == NULL) { 
-        printf("Error: Unable to open the file.\n"); 
-        return NULL; 
-    } 
-
-    // read the file contents into a string 
-    char buffer[1024]; 
-    int len = fread(buffer, 1, sizeof(buffer), fp); 
-    fclose(fp); 
-
-    // parse the JSON data 
+cJSON* read_json_string(char* buffer){
     cJSON *json = cJSON_Parse(buffer); 
     if (json == NULL) { 
         const char *error_ptr = cJSON_GetErrorPtr(); 
@@ -42,6 +30,20 @@ cJSON* read_json() {
         return NULL; 
     } 
     return json;
+}
+
+cJSON* read_json() {
+    FILE *fp = fopen("example.json", "r"); 
+    if (fp == NULL) { 
+        printf("Error: Unable to open the file.\n"); 
+        return NULL; 
+    } 
+
+    char buffer[1024]; 
+    int len = fread(buffer, 1, sizeof(buffer), fp); 
+    fclose(fp); 
+
+    return read_json_string(buffer);
 }
 
 void write_json(cJSON* json) { 
@@ -59,22 +61,36 @@ void write_json(cJSON* json) {
    fclose(fp); 
 }
     
-char* read_request(char *request,  cJSON *json, char *response){
+char* read_request(char *request,  cJSON *json){
+    printf(request);
+    printf("\n");
     cJSON *elem;
     cJSON *name;
     cJSON *name_fetched;
+    cJSON *id_fetched;
+    cJSON* songs = cJSON_CreateArray();
     char genre[MAXBUFLEN];
     char year[MAXBUFLEN];
     char literal_name[MAXBUFLEN];
-    response[0] = '\0';
+    char* response;
     int n = cJSON_GetArraySize(json);
     switch (request[0])
     {
     case '1':
+        cJSON* song = read_json_string(2+request);
+        for (int i = 0; i < n; i++) {
+            elem = cJSON_GetArrayItem(json, i);
+            id_fetched = cJSON_GetObjectItem(elem, "ID");
+            if(strcmp(id_fetched->valuestring, cJSON_GetObjectItem(song, "ID")->valuestring) == 0){
+                response = "0";
+                break;
+            }
+        }
+        cJSON_AddItemToArray(json, song);
+        write_json(json);
+        response = "1";
         break;
-    
     case '2':
-        cJSON *id_fetched;
         char id[MAXBUFLEN];
         strcpy(id, 2+request);
         for (int i = 0; i < n; i++) {
@@ -83,23 +99,32 @@ char* read_request(char *request,  cJSON *json, char *response){
             if(strcmp(id_fetched->valuestring, id) == 0){
                 cJSON_DeleteItemFromArray(json,i);
                 write_json(json);
+                response = "1";
+                return response;
             }
         }
-        return response;
-        
+        response = "0";
+        break;
     case '3':
-        strncpy(year, 2+request, 4);
+        printf(request);
+        printf("\n");
+        strcpy(year, 2+request);
+        printf(year);
+        printf("\n");
         for (int i = 0; i < n; i++) {
             elem = cJSON_GetArrayItem(json, i);
+            printf("kkkkkkkkkkkkkkk\n");
             name = cJSON_GetObjectItem(elem, "Release Date");
+            printf("hahahah\n");
+            printf(name->valuestring);
+            printf("\n");
             if(strcmp(name->valuestring, year) == 0){
-                name = cJSON_GetObjectItem(elem, "Title"); 
-                strcat(response, name->valuestring);
-                strcat(response, ", ");
+                cJSON_AddItemToArray(songs, elem);
             }
         }
-        return response;
-
+        printf("wow");
+        response = cJSON_Print(songs);
+        break;
     case '4':
         char language[MAXBUFLEN];
         cJSON *language_fetched;
@@ -110,13 +135,11 @@ char* read_request(char *request,  cJSON *json, char *response){
             name = cJSON_GetObjectItem(elem, "Release Date");
             language_fetched = cJSON_GetObjectItem(elem, "Language");
             if(strcmp(name->valuestring, year) == 0 && strcmp(language_fetched->valuestring, language) == 0){
-                name = cJSON_GetObjectItem(elem, "Title"); 
-                strcat(response, name->valuestring);
-                strcat(response, ", ");
+                cJSON_AddItemToArray(songs, elem);
             }
         }
-        return response;
-    
+        response = cJSON_Print(songs);
+        break;
     case '5':        
         cJSON *genre_fetched;
         strcpy(genre, 2+request);
@@ -124,93 +147,31 @@ char* read_request(char *request,  cJSON *json, char *response){
             elem = cJSON_GetArrayItem(json, i);
             genre_fetched = cJSON_GetObjectItem(elem, "Genre");
             if(strcmp(genre_fetched->valuestring, genre) == 0){
-                name = cJSON_GetObjectItem(elem, "Title"); 
-                strcat(response, name->valuestring);
-                strcat(response, ", ");
+                cJSON_AddItemToArray(songs, elem);
             }
         }
-        return response;
-    
+        response = cJSON_Print(json);
+        break;
     case '6':
         strcpy(literal_name, 2+request);
-        printf("%s\n", request);
-        printf("%s\n", literal_name);
         for (int i = 0; i < n; i++) {
             elem = cJSON_GetArrayItem(json, i);
             name_fetched = cJSON_GetObjectItem(elem, "Title");
             if(strcmp(name_fetched->valuestring, literal_name) == 0){
-                name = cJSON_GetObjectItem(elem, "Title"); 
-                strcat(response, "Title:\n");
-                strcat(response, name->valuestring);
-                strcat(response, "\n\n");
-                name = cJSON_GetObjectItem(elem, "ID"); 
-                strcat(response, "ID:\n");
-                strcat(response, name->valuestring);
-                strcat(response, "\n\n");
-                name = cJSON_GetObjectItem(elem, "Artist"); 
-                strcat(response, "Artist:\n");
-                strcat(response, name->valuestring);
-                strcat(response, "\n\n");
-                name = cJSON_GetObjectItem(elem, "Language"); 
-                strcat(response, "Language\n");
-                strcat(response, name->valuestring);
-                strcat(response, "\n\n");
-                name = cJSON_GetObjectItem(elem, "Genre"); 
-                strcat(response, "Genre:\n");
-                strcat(response, name->valuestring);
-                strcat(response, "\n\n");
-                name = cJSON_GetObjectItem(elem, "Chorus"); 
-                strcat(response, "Chorus:\n");
-                strcat(response, name->valuestring);
-                strcat(response, "\n\n");
-                name = cJSON_GetObjectItem(elem, "Release Date"); 
-                strcat(response, "Release Date:\n");
-                strcat(response, name->valuestring);
-                strcat(response, "\n\n");
+                response = cJSON_Print(elem);
+                return response;
             }
         }
-        return response;
-    
+        response = "{}";
+        break;
     case '7':
-        for (int i = 0; i < n; i++) {
-            elem = cJSON_GetArrayItem(json, i);
-            name = cJSON_GetObjectItem(elem, "Title"); 
-            strcat(response, "Title:\n");
-            strcat(response, name->valuestring);
-            strcat(response, "\n\n");
-            name = cJSON_GetObjectItem(elem, "ID"); 
-            strcat(response, "ID:\n");
-            strcat(response, name->valuestring);
-            strcat(response, "\n\n");
-            name = cJSON_GetObjectItem(elem, "Artist"); 
-            strcat(response, "Artist:\n");
-            strcat(response, name->valuestring);
-            strcat(response, "\n\n");
-            name = cJSON_GetObjectItem(elem, "Language"); 
-            strcat(response, "Language\n");
-            strcat(response, name->valuestring);
-            strcat(response, "\n\n");
-            name = cJSON_GetObjectItem(elem, "Genre"); 
-            strcat(response, "Genre:\n");
-            strcat(response, name->valuestring);
-            strcat(response, "\n\n");
-            name = cJSON_GetObjectItem(elem, "Chorus"); 
-            strcat(response, "Chorus:\n");
-            strcat(response, name->valuestring);
-            strcat(response, "\n\n");
-            name = cJSON_GetObjectItem(elem, "Release Date"); 
-            strcat(response, "Release Date:\n");
-            strcat(response, name->valuestring);
-            strcat(response, "\n\n");
-        }
-        return response;
-
+        response = cJSON_Print(json);
+        break;
     default:
         break;
     }
 
-    return 0;
-    return name->valuestring;
+    return response;
 }
 
 // get sockaddr, IPv4 or IPv6:
@@ -270,7 +231,7 @@ int main(void)
     freeaddrinfo(servinfo);
 
     printf("listener: waiting to recvfrom...\n");
-    char response[MAXBUFLEN];
+    char* response;
     while(1){
         addr_len = sizeof their_addr;
         if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
@@ -286,11 +247,12 @@ int main(void)
         printf("listener: packet is %d bytes long\n", numbytes);
         buf[numbytes] = '\0';
 
-
-        if ((numbytes = sendto(sockfd, read_request(buf, json, response), strlen(read_request(buf, json, response)), 0,
+        response =  read_request(buf, json);
+        if ((numbytes = sendto(sockfd, response, strlen(response), 0,
              (struct sockaddr *)&their_addr, addr_len)) == -1) {
             perror("talker: sendto");
             exit(1);
+        response[0] = '\0';
     }
 
     }
