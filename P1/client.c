@@ -15,7 +15,7 @@
 
 #define SERVERPORT "4952"    // the port users will be connecting to
 #define MAXBUFLEN 1000
-#define HOSTNAME "snake.lab.ic.unicamp.br"
+#define HOSTNAME "tobias-desktop"
 
 
 int service(char *buf)
@@ -91,6 +91,7 @@ int main(){
 
     char buf[MAXBUFLEN] = {option, '/', '\0'};
     char year[5];
+    char id[1];
     char language[MAXBUFLEN];
     char song_name[MAXBUFLEN];
 
@@ -100,6 +101,11 @@ int main(){
         break;
     
     case '2':
+        printf("Type the ID: ");
+        scanf(" %s", id);
+        strcat(buf, id);
+
+        service(buf);
         break;
         
     case '3':

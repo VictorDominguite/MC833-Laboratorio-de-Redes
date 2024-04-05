@@ -43,6 +43,21 @@ cJSON* read_json() {
     } 
     return json;
 }
+
+void write_json(cJSON* json) { 
+
+   char *json_str = cJSON_Print(json); 
+  
+   // write the JSON string to a file 
+   FILE *fp = fopen("example.json", "w"); 
+   if (fp == NULL) { 
+       printf("Error: Unable to open the file.\n"); 
+       return; 
+   } 
+   printf("%s\n", json_str); 
+   fputs(json_str, fp); 
+   fclose(fp); 
+}
     
 char* read_request(char *request,  cJSON *json, char *response){
     cJSON *elem;
@@ -59,7 +74,18 @@ char* read_request(char *request,  cJSON *json, char *response){
         break;
     
     case '2':
-        break;
+        cJSON *id_fetched;
+        char id[MAXBUFLEN];
+        strcpy(id, 2+request);
+        for (int i = 0; i < n; i++) {
+            elem = cJSON_GetArrayItem(json, i);
+            id_fetched = cJSON_GetObjectItem(elem, "ID");
+            if(strcmp(id_fetched->valuestring, id) == 0){
+                cJSON_DeleteItemFromArray(json,i);
+                write_json(json);
+            }
+        }
+        return response;
         
     case '3':
         strncpy(year, 2+request, 4);
