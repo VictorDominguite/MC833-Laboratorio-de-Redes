@@ -12,14 +12,79 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include "cJSON/cJSON.h"
 
 #define SERVERPORT "4952"    // the port users will be connecting to
-#define MAXBUFLEN 1000
 #define HOSTNAME "tobias-desktop"
+#define MAXBUFLEN 1000
+#define MAXIDLEN 5
+#define MAXYEARLEN 5
+#define MAXSUBSECTIONLEN 50
+#define MAXCHORUSLEN 200
 
+cJSON* read_json_string(char* buffer) {
+    cJSON *json = cJSON_Parse(buffer); 
+    if (json == NULL) { 
+        const char *error_ptr = cJSON_GetErrorPtr(); 
+        if (error_ptr != NULL) { 
+            printf("Error: %s\n", error_ptr); 
+        } 
+        cJSON_Delete(json); 
+        return NULL; 
+    } 
+    return json;
+}
 
-int service(char *buf)
-{
+void print_query_results(char *buf) {
+    printf("\n");
+    if (strlen(buf) == 1) {
+        if (buf[0] == '1') 
+            printf("Operation succeeded!\n");
+        else
+            printf("Operation failed.\n");
+        return;
+    }
+    cJSON *json = read_json_string(buf);
+    int n = cJSON_GetArraySize(json);
+    cJSON *elem;
+    cJSON *id;
+    cJSON *title;
+    cJSON *artist;
+    cJSON *language;
+    cJSON *genre;
+    cJSON *chorus;
+    cJSON *year;
+    for (int i = 0; i < n; i++) {
+        elem = cJSON_GetArrayItem(json, i);
+        
+        id = cJSON_GetObjectItem(elem, "ID");
+        title = cJSON_GetObjectItem(elem, "Title");
+        artist = cJSON_GetObjectItem(elem, "Artist");
+        language = cJSON_GetObjectItem(elem, "Language");
+        genre = cJSON_GetObjectItem(elem, "Genre");
+        chorus = cJSON_GetObjectItem(elem, "Chorus");
+        year = cJSON_GetObjectItem(elem, "Release Date");
+
+        printf(
+            "ID: %s\n"
+            "Title: %s\n"
+            "Artist: %s\n"
+            "Language: %s\n"
+            "Genre: %s\n"
+            "Chorus: \"%s\"\n"
+            "Release Date: %s\n\n", 
+            id->valuestring,
+            title->valuestring,
+            artist->valuestring,
+            language->valuestring,
+            genre->valuestring,
+            chorus->valuestring,
+            year->valuestring
+            );
+    }
+}
+
+int service(char *buf) {
     int sockfd;
     struct addrinfo hints, *servinfo, *p;
     int rv;
@@ -64,7 +129,8 @@ int service(char *buf)
     }
     printf("received nicely\n");
     buf[numbytes] = '\0';
-    printf("%s\n", buf);
+
+    print_query_results(buf);
 
     freeaddrinfo(servinfo);
     close(sockfd);
@@ -73,36 +139,19 @@ int service(char *buf)
 }
 
 
-int main(){
-    printf(
-        "Welcome!\n\n"
-        "What would you like to do?\n"
-        "\t1. Register a new song\n"
-        "\t2. Remove a song\n"
-        "\t3. List all songs from a year\n"
-        "\t4. List all songs of a certain language from a certain year\n"
-        "\t5. List all songs of a genre\n"
-        "\t6. List all info from a certain song\n"
-        "\t7. List all the information from all songs\n"
-    );
-
-    char option;
-    printf("\nType the number corresponding to the desired option: ");
-    scanf(" %c", &option);
-
+void process_operation(char option) {
     char buf[MAXBUFLEN] = {option, '/', '\0'};
-
-    char id[5];
-    char title[100];
-    char artist[100];
-    char language[100];
-    char genre[100];
-    char chorus[100];
-    char year[5];
+    char id[MAXIDLEN];
+    char title[MAXSUBSECTIONLEN];
+    char artist[MAXSUBSECTIONLEN];
+    char language[MAXSUBSECTIONLEN];
+    char genre[MAXSUBSECTIONLEN];
+    char chorus[MAXCHORUSLEN];
+    char year[MAXYEARLEN];
 
     switch (option)
     {
-    case '1':
+    case '1': // Add new song
         printf("Type the ID: ");
         scanf("\n%[^\n]%*c", id);
         printf("Type the song title: ");
@@ -131,12 +180,13 @@ int main(){
         "}", 
         id, title, artist, language, genre, chorus, year);
         strcat(buf, new_song_json);
+        
         printf("%s\n", buf);
 
         service(buf);
         break;
     
-    case '2':
+    case '2': // Remove song
         printf("Type the ID: ");
         scanf(" %s", id);
         strcat(buf, id);
@@ -144,7 +194,7 @@ int main(){
         service(buf);
         break;
         
-    case '3':
+    case '3': // Search by year
         printf("Type the desired year: ");
         scanf(" %s", year);
         strcat(buf, year);
@@ -152,7 +202,7 @@ int main(){
         service(buf);
         break;
 
-    case '4':
+    case '4': // Search by year and language
         printf("Type the desired year: ");
         scanf("%s", year);
         strcat(buf, year);
@@ -165,7 +215,7 @@ int main(){
         service(buf);
         break;
     
-    case '5':
+    case '5': // Search by genre
         char genre[MAXBUFLEN];
         printf("Type the desired genre: ");
         scanf("%s", genre);
@@ -174,7 +224,7 @@ int main(){
         service(buf);
         break;
     
-    case '6':
+    case '6': // Search by song title
         printf("Type the name of the song: ");
         scanf("\n%[^\n]%*c", title);
         strcat(buf, title);
@@ -182,13 +232,38 @@ int main(){
         service(buf);
         break;
     
-    case '7':
+    case '7': // Display all songs
         service(buf);
         break;
 
     default:
         break;
     }
+}
+
+int main() {
+    printf(
+        "Welcome!\n\n"
+        "What would you like to do?\n"
+        "\t1. Register a new song\n"
+        "\t2. Remove a song\n"
+        "\t3. List all songs from a year\n"
+        "\t4. List all songs of a certain language from a certain year\n"
+        "\t5. List all songs of a genre\n"
+        "\t6. List all info from a certain song\n"
+        "\t7. List all the information from all songs\n"
+    );
+
+    char option;
+    printf("\nType the number corresponding to the desired option: ");
+    scanf(" %c", &option);
+
+    if (option > '7' || option < '1') {
+        printf("Invalid operation. Terminating program.\n");
+        return 1;
+    }
+
+    process_operation(option);
 
     return 0;
 }
