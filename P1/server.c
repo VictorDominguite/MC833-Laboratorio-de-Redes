@@ -40,7 +40,7 @@ cJSON* read_json() {
     } 
 
     char buffer[1024]; 
-    int len = fread(buffer, 1, sizeof(buffer), fp); 
+    fread(buffer, 1, sizeof(buffer), fp); 
     fclose(fp); 
 
     return read_json_string(buffer);
@@ -62,7 +62,7 @@ void write_json(cJSON* json) {
 }
     
 char* read_request(char *request,  cJSON *json){
-    printf(request);
+    printf("%s\n", request);
     printf("\n");
     cJSON *elem;
     cJSON *name;
@@ -106,17 +106,17 @@ char* read_request(char *request,  cJSON *json){
         response = "0";
         break;
     case '3':
-        printf(request);
+        printf("%s\n", request);
         printf("\n");
         strcpy(year, 2+request);
-        printf(year);
+        printf("%s", year);
         printf("\n");
         for (int i = 0; i < n; i++) {
             elem = cJSON_GetArrayItem(json, i);
             printf("kkkkkkkkkkkkkkk\n");
             name = cJSON_GetObjectItem(elem, "Release Date");
             printf("hahahah\n");
-            printf(name->valuestring);
+            printf("%s", name->valuestring);
             printf("\n");
             if(strcmp(name->valuestring, year) == 0){
                 cJSON_AddItemToArray(songs, elem);

@@ -42,7 +42,7 @@ int service(char *buf)
             perror("talker: socket");
             continue;
         }
-
+        printf("addr: %s\n", p->ai_addr->sa_data);
         break;
     }
 
@@ -56,12 +56,13 @@ int service(char *buf)
         perror("talker: sendto");
         exit(1);
     }
-
+    printf("sendto didnt fail!!!!!!!\nnum bytes: %d\n", numbytes);
     if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
         p->ai_addr, &p->ai_addrlen)) == -1) {
         perror("recvfrom");
         exit(1);
     }
+    printf("received nicely\n");
     buf[numbytes] = '\0';
     printf("%s\n", buf);
 
@@ -90,14 +91,49 @@ int main(){
     scanf(" %c", &option);
 
     char buf[MAXBUFLEN] = {option, '/', '\0'};
+
+    char id[5];
+    char title[100];
+    char artist[100];
+    char language[100];
+    char genre[100];
+    char chorus[100];
     char year[5];
-    char id[1];
-    char language[MAXBUFLEN];
-    char song_name[MAXBUFLEN];
 
     switch (option)
     {
     case '1':
+        printf("Type the ID: ");
+        scanf("\n%[^\n]%*c", id);
+        printf("Type the song title: ");
+        scanf("\n%[^\n]%*c", title);
+        printf("Type the artist's name: ");
+        scanf("\n%[^\n]%*c", artist);
+        printf("Type the language of the song: ");
+        scanf("\n%[^\n]%*c", language);
+        printf("Type the genre: ");
+        scanf("\n%[^\n]%*c", genre);
+        printf("Type the chorus: ");
+        scanf("\n%[^\n]%*c", chorus);
+        printf("Type the year the song was released: ");
+        scanf("\n%[^\n]%*c", year);
+
+        char new_song_json[MAXBUFLEN];
+        snprintf(new_song_json, sizeof new_song_json, 
+        "{"
+            "\"ID\": \"%s\","
+            "\"Title\": \"%s\","
+            "\"Artist\": \"%s\","
+            "\"Language\": \"%s\","
+            "\"Genre\": \"%s\","
+            "\"Chorus\": \"%s\","
+            "\"Release Date\": \"%s\""
+        "}", 
+        id, title, artist, language, genre, chorus, year);
+        strcat(buf, new_song_json);
+        printf("%s\n", buf);
+
+        service(buf);
         break;
     
     case '2':
@@ -140,8 +176,8 @@ int main(){
     
     case '6':
         printf("Type the name of the song: ");
-        scanf("\n%[^\n]%*c", song_name);
-        strcat(buf, song_name);
+        scanf("\n%[^\n]%*c", title);
+        strcat(buf, title);
 
         service(buf);
         break;
