@@ -150,7 +150,7 @@ char* read_request(char *request,  cJSON *json){
                 cJSON_AddItemToArray(songs, elem);
             }
         }
-        response = cJSON_Print(json);
+        response = cJSON_Print(songs);
         break;
     case '6':
         strcpy(literal_name, 2+request);
