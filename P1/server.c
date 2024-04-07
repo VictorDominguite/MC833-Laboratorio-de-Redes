@@ -248,16 +248,16 @@ int create_socket(){
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; 
     // get full adress from IP and port
-    rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo)
+    rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo);
     if (rv != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
     }
     //create socket
-    sockfd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol)
+    sockfd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
     if (sockfd == -1) perror("server: socket");
     //bind socket with adress
-    rv = bind(sockfd, servinfo->ai_addr, servinfo->ai_addrlen)
+    rv = bind(sockfd, servinfo->ai_addr, servinfo->ai_addrlen);
     if (rv == -1) {
         close(sockfd);
         perror("server: bind");
