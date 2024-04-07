@@ -1,7 +1,3 @@
-/*
-** talker.c -- a datagram "client" demo
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -22,6 +18,8 @@
 #define MAXSUBSECTIONLEN 50
 #define MAXCHORUSLEN 200
 
+/* Receives a string corresponding to a json file and converts it to 
+ * a cJSON object. The converted json object is returned */
 cJSON* read_json_string(char* buffer) {
     cJSON *json = cJSON_Parse(buffer); 
     if (json == NULL) { 
@@ -35,8 +33,12 @@ cJSON* read_json_string(char* buffer) {
     return json;
 }
 
+/* Given a buffer (string) containing the response of the server to a query,
+ * formats and prints the information */
 void print_query_results(char *buf) {
     printf("\n");
+    // if the response is of size 1, then it's a number indicating if
+    // the operation was successful or not
     if (strlen(buf) == 1) {
         if (buf[0] == '1') 
             printf("Operation succeeded!\n");
@@ -44,9 +46,14 @@ void print_query_results(char *buf) {
             printf("Operation failed.\n");
         return;
     }
+
+    // else, the response is in a json format, so the string is converted
+    // to a cJSON object
     cJSON *json = read_json_string(buf);
     int n = cJSON_GetArraySize(json);
+    
     cJSON *elem;
+
     cJSON *id;
     cJSON *title;
     cJSON *artist;
@@ -54,6 +61,9 @@ void print_query_results(char *buf) {
     cJSON *genre;
     cJSON *chorus;
     cJSON *year;
+
+    // Iterates over the elements in the response array, gets the information
+    // from its fields and prints them
     for (int i = 0; i < n; i++) {
         elem = cJSON_GetArrayItem(json, i);
         
@@ -84,12 +94,14 @@ void print_query_results(char *buf) {
     }
 }
 
+
+/* Stablish a TCP connection with the server, sends an operation request 
+ * to it, then receives and prints the server response */
 int service(char *buf) {
     int sockfd;
     struct addrinfo hints, *servinfo, *p;
     int rv;
     int numbytes;
-
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET6; // set to AF_INET to use IPv4
@@ -112,22 +124,22 @@ int service(char *buf) {
     }
 
     if (p == NULL) {
-        fprintf(stderr, "talker: failed to create socket\n");
+        fprintf(stderr, "failed to create socket\n");
         return 2;
     }
 
+    // Sends operation request to server
     if ((numbytes = sendto(sockfd, buf, strlen(buf), 0,
              p->ai_addr, p->ai_addrlen)) == -1) {
         perror("talker: sendto");
         exit(1);
     }
-    printf("sendto didnt fail!!!!!!!\nnum bytes: %d\n", numbytes);
+    // Receives server response
     if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
         p->ai_addr, &p->ai_addrlen)) == -1) {
         perror("recvfrom");
         exit(1);
     }
-    printf("received nicely\n");
     buf[numbytes] = '\0';
 
     print_query_results(buf);
@@ -138,7 +150,7 @@ int service(char *buf) {
     return 0;
 }
 
-
+/* Given an operation code as a char, process the corresponding request */
 void process_operation(char option) {
     char buf[MAXBUFLEN] = {option, '/', '\0'};
     char id[MAXIDLEN];
@@ -152,6 +164,8 @@ void process_operation(char option) {
     switch (option)
     {
     case '1': // Add new song
+
+        // Getting new entry info from user
         printf("Type the ID: ");
         scanf("\n%[^\n]%*c", id);
         printf("Type the song title: ");
@@ -167,6 +181,7 @@ void process_operation(char option) {
         printf("Type the year the song was released: ");
         scanf("\n%[^\n]%*c", year);
 
+        // Arranging buffer with json formatted data for the new song
         char new_song_json[MAXBUFLEN];
         snprintf(new_song_json, sizeof new_song_json, 
         "{"
@@ -180,13 +195,16 @@ void process_operation(char option) {
         "}", 
         id, title, artist, language, genre, chorus, year);
         strcat(buf, new_song_json);
-        
+
         printf("%s\n", buf);
 
+        // Sends request to the server and (hopefully) gets a response
         service(buf);
         break;
     
     case '2': // Remove song
+
+        // Asking the user for the ID
         printf("Type the ID: ");
         scanf(" %s", id);
         strcat(buf, id);
@@ -224,46 +242,54 @@ void process_operation(char option) {
         service(buf);
         break;
     
-    case '6': // Search by song title
-        printf("Type the name of the song: ");
-        scanf("\n%[^\n]%*c", title);
-        strcat(buf, title);
+    case '6': // Search by song id
+        printf("Type the ID of the song: ");
+        scanf("\n%[^\n]%*c", id);
+        strcat(buf, id);
 
         service(buf);
         break;
     
-    case '7': // Display all songs
+    case '7': // Display information from all songs
         service(buf);
         break;
 
     default:
+        printf("\nInvalid operation with code \'%c\'.\n\n", option);
         break;
     }
 }
 
 int main() {
+    char option;
+
     printf(
         "Welcome!\n\n"
-        "What would you like to do?\n"
-        "\t1. Register a new song\n"
-        "\t2. Remove a song\n"
-        "\t3. List all songs from a year\n"
-        "\t4. List all songs of a certain language from a certain year\n"
-        "\t5. List all songs of a genre\n"
-        "\t6. List all info from a certain song\n"
-        "\t7. List all the information from all songs\n"
     );
 
-    char option;
-    printf("\nType the number corresponding to the desired option: ");
-    scanf(" %c", &option);
+    // Runs requests for operations until the user exits the program
+    while(1) {
+        printf(
+            "What would you like to do?\n"
+            "\t1. Register a new song\n"
+            "\t2. Remove a song\n"
+            "\t3. List all songs from a year\n"
+            "\t4. List all songs of a certain language from a certain year\n"
+            "\t5. List all songs of a genre\n"
+            "\t6. List all info from a certain song\n"
+            "\t7. List all the information from all songs\n"
+            "\t0. Exit program\n"
+        );
 
-    if (option > '7' || option < '1') {
-        printf("Invalid operation. Terminating program.\n");
-        return 1;
+        printf("\nType the number corresponding to the desired option: ");
+        scanf(" %c", &option);
+
+        if (option == '0') {
+            printf("\nExiting program.\n");
+            return 0;
+        }
+        process_operation(option);
     }
-
-    process_operation(option);
 
     return 0;
 }
