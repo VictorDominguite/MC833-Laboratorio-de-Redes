@@ -8,7 +8,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <assert.h>
 #include "cJSON/cJSON.h"
 
 #define SERVERPORT "4952"    // the port users will be connecting to
