@@ -119,7 +119,6 @@ int service(char *buf) {
             perror("talker: socket");
             continue;
         }
-        printf("addr: %s\n", p->ai_addr->sa_data);
         break;
     }
 
@@ -244,7 +243,7 @@ void process_operation(char option) {
     
     case '6': // Search by song id
         printf("Type the ID of the song: ");
-        scanf("\n%[^\n]%*c", id);
+        scanf("%s", id);
         strcat(buf, id);
 
         service(buf);
