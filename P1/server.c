@@ -237,34 +237,27 @@ int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
     }
 
     // loop through all the results and bind to the first we can
-    for(p = servinfo; p != NULL; p = p->ai_next) {
-        if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                p->ai_protocol)) == -1) {
-            perror("server: socket");
-            continue;
-        }
 
-        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
-                sizeof(int)) == -1) {
-            perror("setsockopt");
-            exit(1);
-        }
-
-        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close(sockfd);
-            perror("server: bind");
-            continue;
-        }
-
-        break;
+    if ((sockfd = socket(servinfo->ai_family, servinfo->ai_socktype,
+            servinfo->ai_protocol)) == -1) {
+        perror("server: socket");
     }
+
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+            sizeof(int)) == -1) {
+        perror("setsockopt");
+        exit(1);
+    }
+
+    if (bind(sockfd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
+        close(sockfd);
+        perror("server: bind");
+    }
+
+
 
     freeaddrinfo(servinfo); // all done with this structure
 
-    if (p == NULL)  {
-        fprintf(stderr, "server: failed to bind\n");
-        exit(1);
-    }
 
     if (listen(sockfd, BACKLOG) == -1) {
         perror("listen");
@@ -294,15 +287,14 @@ int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
             get_in_addr((struct sockaddr *)&their_addr),
             s, sizeof s);
         printf("server: got connection from %s\n", s);
-
-        if (numbytes = recv(new_fd, buf, MAXBUFLEN-1 , 0) == -1)
+        if (numbytes = read(new_fd, buf, MAXBUFLEN-1) == -1)
             perror("send");
+        printf("%d\n", numbytes);
 
-        buf[numbytes] = '\0';
         printf("%s\n", buf);
         response =  read_request(buf, json);// act!
         // respond properly to the request:
-        if (numbytes = send(new_fd, response, strlen(response), 0) == -1) {
+        if (numbytes = write(new_fd, response, strlen(response), 0) == -1) {
             perror("send");
             exit(1);
         response[0] = '\0';
@@ -310,10 +302,11 @@ int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
 
 
         close(new_fd);
+        close(sockfd);
  // parent doesn't need this
     }
 
     }
-    close(sockfd);
+    
     return 0;
 }

@@ -122,42 +122,36 @@ int service(char *buf) {
     }
 
     // loop through all the results and connect to the first we can
-    for(p = servinfo; p != NULL; p = p->ai_next) {
-        if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                p->ai_protocol)) == -1) {
-            perror("client: socket");
-            continue;
-        }
 
-        if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close(sockfd);
-            perror("client: connect");
-            continue;
-        }
-
-        break;
+    if ((sockfd = socket(servinfo->ai_family, servinfo->ai_socktype,
+            servinfo->ai_protocol)) == -1) {
+        perror("client: socket");
     }
 
-    if (p == NULL) {
-        fprintf(stderr, "client: failed to connect\n");
-        return 2;
+    if (connect(sockfd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
+        close(sockfd);
+        perror("client: connect");
     }
 
-    inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
+
+    inet_ntop(servinfo->ai_family, get_in_addr((struct sockaddr *)servinfo->ai_addr),
             s, sizeof s);
     printf("client: connecting to %s\n", s);
 
     // Sends operation request to server
-    if (numbytes = send(sockfd, buf, strlen(buf), 0) == -1) {
+    printf("%s\n", buf);
+    printf("%d\n", strlen(buf));
+    if (numbytes = write(sockfd, buf, strlen(buf)) == -1) {
         perror("send");
         exit(1);
     }
+    printf("%d\n", numbytes);
     // Receives server response
-    if (numbytes = recv(sockfd, buf, MAXBUFLEN-1 , 0) == -1) {
+    if (numbytes = read(sockfd, buf, MAXBUFLEN-1) == -1) {
         perror("recv");
         exit(1);
     }
-    buf[numbytes] = '\0';
+    printf("%s\n", buf);
 
     print_query_results(buf);
 
