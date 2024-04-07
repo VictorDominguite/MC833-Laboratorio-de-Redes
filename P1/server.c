@@ -91,8 +91,9 @@ char* read_request(char *request,  cJSON *json){
     char genre[MAXBUFLEN];
     char year[MAXBUFLEN];
     char literal_name[MAXBUFLEN];
-    char* response;
+    char* response = (char*)malloc(MAXBUFLEN);
     int n = cJSON_GetArraySize(json);
+
     switch (request[0])
     {
     case '1':
@@ -103,13 +104,13 @@ char* read_request(char *request,  cJSON *json){
             elem = cJSON_GetArrayItem(json, i);
             id_fetched = cJSON_GetObjectItem(elem, "ID");
             if(strcmp(id_fetched->valuestring, cJSON_GetObjectItem(song, "ID")->valuestring) == 0){
-                response = "0"; //cannot register a song with an existing ID
+                strcpy(response, "0"); //cannot register a song with an existing ID
                 return response;
             }
         }
         cJSON_AddItemToArray(json, song);
         write_json(json);
-        response = "1";
+        strcpy(response, "1");
         break;
     case '2':
         //2. Delete a song
@@ -122,11 +123,11 @@ char* read_request(char *request,  cJSON *json){
             if(strcmp(id_fetched->valuestring, id) == 0){
                 cJSON_DeleteItemFromArray(json,i);
                 write_json(json);
-                response = "1";
+                strcpy(response, "1");
                 return response;
             }
         }
-        response = "0"; //ID doesnt exist
+        strcpy(response, "0"); //ID doesnt exist
         break;
     case '3':
         //3. List all songs from a year
@@ -136,10 +137,10 @@ char* read_request(char *request,  cJSON *json){
             elem = cJSON_GetArrayItem(json, i);
             name = cJSON_GetObjectItem(elem, "Release Date");
             if(strcmp(name->valuestring, year) == 0){
-                cJSON_AddItemToArray(songs, elem);
+                cJSON_AddItemReferenceToArray(songs, elem);
             }
         }
-        response = cJSON_Print(songs);
+        strcpy(response, cJSON_Print(songs));
         break;
     case '4':
         //4. List all songs of a certain language from a certain year
@@ -153,10 +154,10 @@ char* read_request(char *request,  cJSON *json){
             name = cJSON_GetObjectItem(elem, "Release Date");
             language_fetched = cJSON_GetObjectItem(elem, "Language");
             if(strcmp(name->valuestring, year) == 0 && strcmp(language_fetched->valuestring, language) == 0){
-                cJSON_AddItemToArray(songs, elem);
+                cJSON_AddItemReferenceToArray(songs, elem);
             }
         }
-        response = cJSON_Print(songs);
+        strcpy(response, cJSON_Print(songs));
         break;
     case '5':
         //5. List all songs of a genre
@@ -167,10 +168,10 @@ char* read_request(char *request,  cJSON *json){
             elem = cJSON_GetArrayItem(json, i);
             genre_fetched = cJSON_GetObjectItem(elem, "Genre");
             if(strcmp(genre_fetched->valuestring, genre) == 0){
-                cJSON_AddItemToArray(songs, elem);
+                cJSON_AddItemReferenceToArray(songs, elem);
             }
         }
-        response = cJSON_Print(songs);
+        strcpy(response, cJSON_Print(songs));
         break;
     case '6':
         //6. List all info from a certain song
@@ -180,21 +181,20 @@ char* read_request(char *request,  cJSON *json){
             elem = cJSON_GetArrayItem(json, i);
             name_fetched = cJSON_GetObjectItem(elem, "ID");
             if(strcmp(name_fetched->valuestring, literal_name) == 0){
-                cJSON_AddItemToArray(songs, elem);
+                cJSON_AddItemReferenceToArray(songs, elem);
                 break;
             }
         }
-        response = cJSON_Print(songs);
+        strcpy(response, cJSON_Print(songs));
         break;
     case '7':
         //7. List all the information from all songs
         // returns [song_object, ...] being song_object each of the songs from database 
-        response = cJSON_Print(json);
+        strcpy(response, cJSON_Print(json));
         break;
     default:
         break;
     }
-
     return response;
 }
 
@@ -273,19 +273,19 @@ void service(int new_fd, cJSON* json){
     if (read(new_fd, buf, MAXBUFLEN-1) == -1)
         perror("send");
 
-    response =  read_request(buf, json);// act!
+    response = read_request(buf, json);// act!
     // respond properly to the request:
     if (write(new_fd, response, strlen(response)) == -1) {
         perror("send");
+        free(response);
         exit(1);
     }
+    free(response);
 }
 
 int main(void){
     int sockfd, new_fd;
     struct sockaddr_storage their_addr;
-    //gets our server's data
-    cJSON *json = read_json();
     //creates a first socket and defines all its properties
     sockfd = create_socket();
     //listen - socket is now open for TCP connections
@@ -298,6 +298,8 @@ int main(void){
         // resolve new_connection in child porcess
         if (fork() == 0) { 
             close(sockfd);
+            //gets our server's data
+            cJSON *json = read_json();
             service(new_fd, json);
             exit(0);
         }

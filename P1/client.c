@@ -8,11 +8,12 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <assert.h>
 #include "cJSON/cJSON.h"
 
 #define SERVERPORT "4952"    // the port users will be connecting to
-#define HOSTNAME "tobias-desktop"
-#define MAXBUFLEN 1000
+#define HOSTNAME "DESKTOP-32IVUBT"
+#define MAXBUFLEN 10000
 #define MAXIDLEN 5
 #define MAXYEARLEN 5
 #define MAXSUBSECTIONLEN 50
@@ -38,12 +39,12 @@ cJSON* read_json_string(char* buffer) {
 void print_query_results(char *buf) {
     printf("\n");
     // if the response is of size 1, then it's a number indicating if
-    // the operation was successful or not
-    if (strlen(buf) == 1) {
+    // the operation was successful or not (for adding/removing songs)
+    if ((int) strlen(buf) == 1) {
         if (buf[0] == '1') 
-            printf("Operation succeeded!\n");
+            printf("Operation succeeded!\n\n");
         else
-            printf("Operation failed.\n");
+            printf("Operation failed.\n\n");
         return;
     }
 
@@ -52,6 +53,11 @@ void print_query_results(char *buf) {
     cJSON *json = read_json_string(buf);
     int n = cJSON_GetArraySize(json);
     
+    if (n == 0) {
+        printf("No results.\n\n");
+        return;
+    }
+
     cJSON *elem;
 
     cJSON *id;
@@ -108,9 +114,11 @@ void *get_in_addr(struct sockaddr *sa)
  * to it, then receives and prints the server response */
 int service(char *buf) {
     int sockfd;  
-    struct addrinfo hints, *servinfo, *p;
+    struct addrinfo hints, *servinfo;
     int rv;
     char s[INET6_ADDRSTRLEN];
+    char* response = (char*)malloc(MAXBUFLEN);
+    int numbytes_read;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
@@ -141,13 +149,14 @@ int service(char *buf) {
         exit(1);
     }
     // Receives server response
-    if (read(sockfd, buf, MAXBUFLEN-1) == -1) {
+    if ((numbytes_read = read(sockfd, response, MAXBUFLEN-1)) == -1) {
         perror("recv");
         exit(1);
     }
+    response[numbytes_read] = '\0';
+    print_query_results(response);
 
-    print_query_results(buf);
-
+    free(response);
     freeaddrinfo(servinfo);
     close(sockfd);
 
@@ -182,9 +191,10 @@ void process_operation(char option) {
         scanf("\n%[^\n]%*c", genre);
         printf("Type the chorus: ");
         scanf("\n%[^\n]%*c", chorus);
-        printf("Type the year the song was released: ");
+        do {
+        printf("Type the year the song was released (4 digits): ");
         scanf("\n%[^\n]%*c", year);
-
+        } while(strlen(year) != 4);
         // Arranging buffer with json formatted data for the new song
         char new_song_json[MAXBUFLEN];
         snprintf(new_song_json, sizeof new_song_json, 
@@ -199,8 +209,6 @@ void process_operation(char option) {
         "}", 
         id, title, artist, language, genre, chorus, year);
         strcat(buf, new_song_json);
-
-        printf("%s\n", buf);
 
         // Sends request to the server and (hopefully) gets a response
         service(buf);
