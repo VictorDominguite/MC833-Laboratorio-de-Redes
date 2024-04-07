@@ -210,103 +210,99 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-int main(void)
-{
-int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
-    struct addrinfo hints, *servinfo, *p;
-    struct sockaddr_storage their_addr; // connector's address information
+void server_listen(int sockfd){
+    /*
+    Announce willingness to accept connections, give queue size
+    change socket state for TCP server.
+    */
+    int listen_response = listen(sockfd, BACKLOG);
+
+    if (listen_response == -1) {
+        perror("listen");
+        exit(1);
+    }
+    printf("server: waiting for connections...\n");
+}
+
+int server_accept(int sockfd, struct sockaddr_storage their_addr){
+    /*
+        Return next completed connection
+    */
     socklen_t sin_size;
-    struct sigaction sa;
-    int yes=1;
-    char s[INET6_ADDRSTRLEN];
-    int rv;
-    int numbytes;
-    char buf[MAXBUFLEN];
+    sin_size = sizeof their_addr;
+    int new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+    if (new_fd == -1) perror("accept");
+    return new_fd;
+}
 
+int create_socket(){
+    /*
+    Creates a new socket and binds it based on server's IP and port determined
 
-    cJSON *json = read_json();  
+    */
+    int rv, sockfd;
+    struct addrinfo hints, *servinfo;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE; // use my IP
-
-    if ((rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo)) != 0) {
+    hints.ai_flags = AI_PASSIVE; 
+    // get full adress from IP and port
+    rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo)
+    if (rv != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
     }
-
-    // loop through all the results and bind to the first we can
-
-    if ((sockfd = socket(servinfo->ai_family, servinfo->ai_socktype,
-            servinfo->ai_protocol)) == -1) {
-        perror("server: socket");
-    }
-
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
-            sizeof(int)) == -1) {
-        perror("setsockopt");
-        exit(1);
-    }
-
-    if (bind(sockfd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
+    //create socket
+    sockfd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol)
+    if (sockfd == -1) perror("server: socket");
+    //bind socket with adress
+    rv = bind(sockfd, servinfo->ai_addr, servinfo->ai_addrlen)
+    if (rv == -1) {
         close(sockfd);
         perror("server: bind");
     }
 
+    freeaddrinfo(servinfo);
+    return sockfd;
+}
 
-
-    freeaddrinfo(servinfo); // all done with this structure
-
-
-    if (listen(sockfd, BACKLOG) == -1) {
-        perror("listen");
-        exit(1);
-    }
-
-    sa.sa_handler = sigchld_handler; // reap all dead processes
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-        perror("sigaction");
-        exit(1);
-    }
-
-    printf("server: waiting for connections...\n");
-
+void service(int new_fd, cJSON* json){
+    char buf[MAXBUFLEN];
     char* response;
+    if (read(new_fd, buf, MAXBUFLEN-1) == -1)
+        perror("send");
+
+    response =  read_request(buf, json);// act!
+    // respond properly to the request:
+    if (write(new_fd, response, strlen(response)) == -1) {
+        perror("send");
+        exit(1);
+    }
+}
+
+int main(void){
+    int sockfd, new_fd;
+    struct sockaddr_storage their_addr;
+    //gets our server's data
+    cJSON *json = read_json();
+    //creates a first socket and defines all its properties
+    sockfd = create_socket();
+    //listen - socket is now open for TCP connections
+    server_listen(sockfd);
     // loop infinetly, everytime that receives somthing in the socket, do some operation
     while(1){
-        sin_size = sizeof their_addr;
-        new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
-        if (new_fd == -1) {
-            perror("accept");
-            continue;
+        //accept new_connection
+        new_fd = server_accept(sockfd, their_addr);
+        if (new_fd == -1) continue;
+        // resolve new_connection in child porcess
+        if (fork() == 0) { 
+            close(sockfd);
+            service(new_fd, json);
+            exit(0);
         }
-        inet_ntop(their_addr.ss_family,
-            get_in_addr((struct sockaddr *)&their_addr),
-            s, sizeof s);
-        printf("server: got connection from %s\n", s);
-        if (numbytes = read(new_fd, buf, MAXBUFLEN-1) == -1)
-            perror("send");
-        printf("%d\n", numbytes);
-
-        printf("%s\n", buf);
-        response =  read_request(buf, json);// act!
-        // respond properly to the request:
-        if (numbytes = write(new_fd, response, strlen(response), 0) == -1) {
-            perror("send");
-            exit(1);
-        response[0] = '\0';
-
-
-
         close(new_fd);
-        close(sockfd);
- // parent doesn't need this
     }
-
-    }
-    
+    close(sockfd);
     return 0;
 }

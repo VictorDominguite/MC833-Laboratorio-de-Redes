@@ -107,7 +107,7 @@ void *get_in_addr(struct sockaddr *sa)
 /* Stablish a TCP connection with the server, sends an operation request 
  * to it, then receives and prints the server response */
 int service(char *buf) {
-    int sockfd, numbytes;  
+    int sockfd;  
     struct addrinfo hints, *servinfo, *p;
     int rv;
     char s[INET6_ADDRSTRLEN];
@@ -121,8 +121,6 @@ int service(char *buf) {
         return 1;
     }
 
-    // loop through all the results and connect to the first we can
-
     if ((sockfd = socket(servinfo->ai_family, servinfo->ai_socktype,
             servinfo->ai_protocol)) == -1) {
         perror("client: socket");
@@ -133,25 +131,20 @@ int service(char *buf) {
         perror("client: connect");
     }
 
-
     inet_ntop(servinfo->ai_family, get_in_addr((struct sockaddr *)servinfo->ai_addr),
             s, sizeof s);
     printf("client: connecting to %s\n", s);
 
     // Sends operation request to server
-    printf("%s\n", buf);
-    printf("%d\n", strlen(buf));
-    if (numbytes = write(sockfd, buf, strlen(buf)) == -1) {
+    if (write(sockfd, buf, strlen(buf)) == -1) {
         perror("send");
         exit(1);
     }
-    printf("%d\n", numbytes);
     // Receives server response
-    if (numbytes = read(sockfd, buf, MAXBUFLEN-1) == -1) {
+    if (read(sockfd, buf, MAXBUFLEN-1) == -1) {
         perror("recv");
         exit(1);
     }
-    printf("%s\n", buf);
 
     print_query_results(buf);
 
