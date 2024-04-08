@@ -101,6 +101,9 @@ char* read_request(char *request,  cJSON *json){
 
     switch (request[0])
     {
+    case '0':
+        strcpy(response, "0");
+        break;
     case '1':
         //1. Register a new song
         // returns 0/1 if failed/succeded
@@ -282,7 +285,6 @@ int service(int new_fd, cJSON* json){
         return 0;
     }
     buf[numbytes_read] = '\0';
-    if (buf[0] == '0') return 0; // terminate connection
 
     response = read_request(buf, json);// act!
     // respond properly to the request:
@@ -292,6 +294,7 @@ int service(int new_fd, cJSON* json){
         exit(1);
     }
     free(response);
+    if (buf[0] == '0') return 0; // terminate connection
     return 1;
 }
 
