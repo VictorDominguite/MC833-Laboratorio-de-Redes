@@ -22,7 +22,6 @@
 #define MAXCHORUSLEN 200
 #define BACKLOG 10   // how many pending connections queue will hold
 
-cJSON *json = read_json();
 
 void sigchld_handler(int s)
 {
@@ -276,11 +275,13 @@ int create_socket(){
 int service(int new_fd, cJSON* json){
     char buf[MAXBUFLEN];
     char* response;
-    if (read(new_fd, buf, MAXBUFLEN-1) == -1){
+    int numbytes_read;
+
+    if ((numbytes_read = read(new_fd, buf, MAXBUFLEN-1)) == -1){
         perror("send");
         return 0;
     }
-    
+    buf[numbytes_read] = '\0';
     if (buf[0] == '0') return 0; // terminate connection
 
     response = read_request(buf, json);// act!
@@ -312,7 +313,8 @@ int main(void){
             //gets our server's data
             while (1)
             {
-                keep_connection = (new_fd, json);
+                cJSON *json = read_json();
+                keep_connection = service(new_fd, json);
                 //exit tcp connection on client call or error
                 if (keep_connection == 0) break;
             }

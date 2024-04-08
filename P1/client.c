@@ -11,7 +11,6 @@
 #include "cJSON/cJSON.h"
 
 #define SERVERPORT "4952"    // the port users will be connecting to
-#define HOSTNAME "DESKTOP-32IVUBT"
 #define MAXBUFLEN 10000
 #define MAXIDLEN 5
 #define MAXYEARLEN 5
@@ -109,38 +108,11 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-/* Stablish a TCP connection with the server, sends an operation request 
- * to it, then receives and prints the server response */
-int service(char *buf) {
-    int sockfd;  
-    struct addrinfo hints, *servinfo;
-    int rv;
-    char s[INET6_ADDRSTRLEN];
+/* Sends an operation request through a TCP connection using the
+ * socket sockfd, then receives and prints the server response */
+int service(char *buf, int sockfd) {
     char* response = (char*)malloc(MAXBUFLEN);
     int numbytes_read;
-
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-
-    if ((rv = getaddrinfo(HOSTNAME, SERVERPORT, &hints, &servinfo)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-        return 1;
-    }
-
-    if ((sockfd = socket(servinfo->ai_family, servinfo->ai_socktype,
-            servinfo->ai_protocol)) == -1) {
-        perror("client: socket");
-    }
-
-    if (connect(sockfd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
-        close(sockfd);
-        perror("client: connect");
-    }
-
-    inet_ntop(servinfo->ai_family, get_in_addr((struct sockaddr *)servinfo->ai_addr),
-            s, sizeof s);
-    printf("client: connecting to %s\n", s);
 
     // Sends operation request to server
     if (write(sockfd, buf, strlen(buf)) == -1) {
@@ -156,14 +128,12 @@ int service(char *buf) {
     print_query_results(response);
 
     free(response);
-    freeaddrinfo(servinfo);
-    close(sockfd);
 
     return 0;
 }
 
 /* Given an operation code as a char, process the corresponding request */
-void process_operation(char option) {
+void process_operation(char option, int sockfd) {
     char buf[MAXBUFLEN] = {option, '/', '\0'};
     char id[MAXIDLEN];
     char title[MAXSUBSECTIONLEN];
@@ -175,6 +145,10 @@ void process_operation(char option) {
 
     switch (option)
     {
+    case '0': // Ends connection
+        service(buf, sockfd);
+        break;
+
     case '1': // Add new song
 
         // Getting new entry info from user
@@ -210,7 +184,7 @@ void process_operation(char option) {
         strcat(buf, new_song_json);
 
         // Sends request to the server and (hopefully) gets a response
-        service(buf);
+        service(buf, sockfd);
         break;
     
     case '2': // Remove song
@@ -220,7 +194,7 @@ void process_operation(char option) {
         scanf(" %s", id);
         strcat(buf, id);
 
-        service(buf);
+        service(buf, sockfd);
         break;
         
     case '3': // Search by year
@@ -228,7 +202,7 @@ void process_operation(char option) {
         scanf(" %s", year);
         strcat(buf, year);
 
-        service(buf);
+        service(buf, sockfd);
         break;
 
     case '4': // Search by year and language
@@ -241,7 +215,7 @@ void process_operation(char option) {
         scanf("%s", language);
         strcat(buf, language);
 
-        service(buf);
+        service(buf, sockfd);
         break;
     
     case '5': // Search by genre
@@ -250,7 +224,7 @@ void process_operation(char option) {
         scanf("%s", genre);
         strcat(buf, genre);
 
-        service(buf);
+        service(buf, sockfd);
         break;
     
     case '6': // Search by song id
@@ -258,11 +232,11 @@ void process_operation(char option) {
         scanf("%s", id);
         strcat(buf, id);
 
-        service(buf);
+        service(buf, sockfd);
         break;
     
     case '7': // Display information from all songs
-        service(buf);
+        service(buf, sockfd);
         break;
 
     default:
@@ -271,8 +245,63 @@ void process_operation(char option) {
     }
 }
 
-int main() {
+/* Connects to the host given by hostname using a TCP connection, saves
+ * the created socket in sockfd and returns an addrinfo struct */
+struct addrinfo* stablish_tcp_connection(char *hostname, int *sockfd) {
+    struct addrinfo hints, *servinfo;
+    int rv;
+    char s[INET6_ADDRSTRLEN];
+
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    if ((rv = getaddrinfo(hostname, SERVERPORT, &hints, &servinfo)) != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+        return NULL;
+    }
+
+    if ((*sockfd = socket(servinfo->ai_family, servinfo->ai_socktype,
+            servinfo->ai_protocol)) == -1) {
+        perror("client: socket");
+    }
+
+    if (connect(*sockfd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
+        close(*sockfd);
+        perror("client: connect");
+    }
+
+    inet_ntop(servinfo->ai_family, get_in_addr((struct sockaddr *)servinfo->ai_addr),
+            s, sizeof s);
+    printf("client: connecting to %s\n", s);
+
+    return servinfo;
+}
+
+/* Closes a TCP connection with the information from servinfo and sockfd */
+void close_tcp_connection(struct addrinfo *servinfo, int sockfd) {
+    freeaddrinfo(servinfo);
+    close(sockfd);
+}
+
+int main(int argc, char *argv[]) {
     char option;
+    int *sockfd = (int*) malloc(sizeof(int));
+    struct addrinfo *servinfo;
+
+    if (argc != 2) {
+        free(sockfd);
+        fprintf(stderr,"usage: %s hostname\n", argv[0]);
+        exit(1);
+    }
+    
+    servinfo = stablish_tcp_connection(argv[1], sockfd);
+
+    if (servinfo == NULL) {
+        free(sockfd);
+        printf("Failed to stablish connection. Exiting program\n");
+        exit(1);
+    }
 
     printf(
         "Welcome!\n\n"
@@ -295,11 +324,14 @@ int main() {
         printf("\nType the number corresponding to the desired option: ");
         scanf(" %c", &option);
 
+        process_operation(option, *sockfd);
+        
         if (option == '0') {
+            close_tcp_connection(servinfo, *sockfd);
+            free(sockfd);
             printf("\nExiting program.\n");
             return 0;
         }
-        process_operation(option);
     }
 
     return 0;
