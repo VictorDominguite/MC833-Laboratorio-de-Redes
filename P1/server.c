@@ -15,8 +15,14 @@
 
 #define MYPORT "4952"    // the port users will be connecting to
 
-#define MAXBUFLEN 100000
+#define MAXBUFLEN 10000
+#define MAXIDLEN 5
+#define MAXYEARLEN 5
+#define MAXSUBSECTIONLEN 50
+#define MAXCHORUSLEN 200
 #define BACKLOG 10   // how many pending connections queue will hold
+
+cJSON *json = read_json();
 
 void sigchld_handler(int s)
 {
@@ -88,9 +94,9 @@ char* read_request(char *request,  cJSON *json){
     cJSON *name_fetched;
     cJSON *id_fetched;
     cJSON* songs = cJSON_CreateArray();
-    char genre[MAXBUFLEN];
-    char year[MAXBUFLEN];
-    char literal_name[MAXBUFLEN];
+    char genre[MAXSUBSECTIONLEN];
+    char year[MAXYEARLEN];
+    char literal_name[MAXSUBSECTIONLEN];
     char* response = (char*)malloc(MAXBUFLEN);
     int n = cJSON_GetArraySize(json);
 
@@ -115,7 +121,7 @@ char* read_request(char *request,  cJSON *json){
     case '2':
         //2. Delete a song
         // returns 0/1 if failed/succeded
-        char id[MAXBUFLEN];
+        char id[MAXIDLEN];
         strcpy(id, 2+request);
         for (int i = 0; i < n; i++) {
             elem = cJSON_GetArrayItem(json, i);
@@ -145,7 +151,7 @@ char* read_request(char *request,  cJSON *json){
     case '4':
         //4. List all songs of a certain language from a certain year
         // returns [song_object, ...] being song_object each of the songs from the year and language requested  
-        char language[MAXBUFLEN];
+        char language[MAXSUBSECTIONLEN];
         cJSON *language_fetched;
         strcpy(language, 7+request);
         strncpy(year, 2+request, 4);
@@ -267,11 +273,15 @@ int create_socket(){
     return sockfd;
 }
 
-void service(int new_fd, cJSON* json){
+int service(int new_fd, cJSON* json){
     char buf[MAXBUFLEN];
     char* response;
-    if (read(new_fd, buf, MAXBUFLEN-1) == -1)
+    if (read(new_fd, buf, MAXBUFLEN-1) == -1){
         perror("send");
+        return 0;
+    }
+    
+    if (buf[0] == '0') return 0; // terminate connection
 
     response = read_request(buf, json);// act!
     // respond properly to the request:
@@ -281,10 +291,11 @@ void service(int new_fd, cJSON* json){
         exit(1);
     }
     free(response);
+    return 1;
 }
 
 int main(void){
-    int sockfd, new_fd;
+    int sockfd, new_fd, keep_connection;
     struct sockaddr_storage their_addr;
     //creates a first socket and defines all its properties
     sockfd = create_socket();
@@ -299,8 +310,13 @@ int main(void){
         if (fork() == 0) { 
             close(sockfd);
             //gets our server's data
-            cJSON *json = read_json();
-            service(new_fd, json);
+            while (1)
+            {
+                keep_connection = (new_fd, json);
+                //exit tcp connection on client call or error
+                if (keep_connection == 0) break;
+            }
+            
             exit(0);
         }
         close(new_fd);
