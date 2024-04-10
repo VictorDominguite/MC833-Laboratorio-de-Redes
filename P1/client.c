@@ -166,12 +166,10 @@ int read_all(int sockfd, char* response) {
         response[total_received] = '\0';
 
     } while(total_received < HEADERBUFSIZELEN);
-    
-    // Convert the number from string to int
+
     strncpy(str_total_to_receive, response, HEADERBUFSIZELEN);
     str_total_to_receive[HEADERBUFSIZELEN] = '\0';
     total_to_receive = atoi(response);
-    total_to_receive -= total_received;
 
     // Receives the rest of the message
     while(total_received < total_to_receive) {
@@ -180,7 +178,6 @@ int read_all(int sockfd, char* response) {
             return -1;
         }
         total_received += numbytes_read;
-        total_to_receive -= numbytes_read;
         partial_response[numbytes_read] = '\0';
         strcat(response, partial_response);
         response[total_received] = '\0';
