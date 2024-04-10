@@ -13,7 +13,7 @@
 #include <netdb.h>
 #include "cJSON/cJSON.h"
 
-#define MYPORT "4952"    // the port users will be connecting to
+#define MYPORT "3220"    // the port users will be connecting to
 
 #define MAXBUFLEN 10000
 #define MAXIDLEN 5
@@ -21,7 +21,7 @@
 #define MAXSUBSECTIONLEN 50
 #define MAXCHORUSLEN 200
 #define BACKLOG 10   // how many pending connections queue will hold
-
+#define HEADERBUFSIZELEN 5
 
 void sigchld_handler(int s)
 {
@@ -275,24 +275,96 @@ int create_socket(){
     return sockfd;
 }
 
+char* padding(char* final_string, char* s, int size){
+    int pad = size - strlen(s);
+    strcpy(final_string, "\0");
+    char* pad_item = "0";
+    for(int i = 0; i<pad; i++){
+        strcat(final_string, pad_item);
+    }
+    strcat(final_string, s);
+}
+
+char* attach_buf_size_header(char* buf){
+    char final_string[MAXBUFLEN];
+    int size = strlen(buf) + HEADERBUFSIZELEN + 1;
+    char size_str[HEADERBUFSIZELEN];
+    sprintf(size_str, "%d", size);  
+    padding(final_string, size_str, HEADERBUFSIZELEN);
+    strcat(final_string, buf);
+    strcpy(buf, final_string);
+}
+
+
+int send_all(int sockfd, char* buf) {
+    int total_sent = 0, n;
+    int bytes_to_send = strlen(buf);
+    int total_to_send = strlen(buf);
+
+    while(total_sent < total_to_send){
+        // Sends operation request to server
+        if ((n = write(sockfd, buf, bytes_to_send)) == -1) {
+            perror("send");
+            return -1;
+        }
+        total_sent += n;
+        bytes_to_send -= n;
+    }
+    return 0;
+}
+
+int read_all(int sockfd, char* response) {
+    char partial_response[MAXBUFLEN];
+    int total_received = 0, total_to_receive = -1;
+    int numbytes_read;
+    char str_total_to_receive[HEADERBUFSIZELEN + 1];
+
+    response[0] = '\0';
+
+    // Get the total bytes that are going to be received
+    do {
+        if ((numbytes_read = read(sockfd, partial_response, HEADERBUFSIZELEN)) == -1) {
+            perror("read");
+            return -1;
+        }
+        total_received += numbytes_read;
+        partial_response[numbytes_read] = '\0';
+        strcat(response, partial_response);
+        response[total_received] = '\0';
+
+    } while(total_received < HEADERBUFSIZELEN);
+
+    strncpy(str_total_to_receive, response, HEADERBUFSIZELEN);
+    str_total_to_receive[HEADERBUFSIZELEN] = '\0';
+    total_to_receive = atoi(response);
+    total_to_receive -= total_received;
+
+    // Receives the rest of the message
+    while(total_received < total_to_receive) {
+        if ((numbytes_read = read(sockfd, response, MAXBUFLEN-1)) == -1) {
+            perror("read");
+            return -1;
+        }
+        total_received += numbytes_read;
+        total_to_receive -= numbytes_read;
+        partial_response[numbytes_read] = '\0';
+        strcat(response, partial_response);
+        response[total_received] = '\0';
+    }
+
+    return 0;
+}
+
 int service(int new_fd, cJSON* json){
     char buf[MAXBUFLEN];
     char* response;
-    int numbytes_read;
-
-    if ((numbytes_read = read(new_fd, buf, MAXBUFLEN-1)) == -1){
-        perror("send");
-        return 0;
-    }
-    buf[numbytes_read] = '\0';
-
-    response = read_request(buf, json);// act!
     // respond properly to the request:
-    if (write(new_fd, response, strlen(response)) == -1) {
-        perror("send");
-        free(response);
-        exit(1);
-    }
+    read_all(new_fd, buf);
+    response = read_request(&buf[HEADERBUFSIZELEN + 1], json);// act!
+    
+    attach_buf_size_header(response);
+    send_all(new_fd, response);
+
     free(response);
     if (buf[0] == '0') return 0; // terminate connection
     return 1;
