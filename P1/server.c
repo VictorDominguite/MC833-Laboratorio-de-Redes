@@ -342,7 +342,7 @@ int read_all(int sockfd, char* response) {
 
     // Receives the rest of the message
     while(total_received < total_to_receive) {
-        if ((numbytes_read = read(sockfd, response, MAXBUFLEN-1)) == -1) {
+        if ((numbytes_read = read(sockfd, partial_response, MAXBUFLEN-1)) == -1) {
             perror("read");
             return -1;
         }
