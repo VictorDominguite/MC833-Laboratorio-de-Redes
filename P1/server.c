@@ -291,6 +291,7 @@ char* attach_buf_size_header(char* buf){
     char size_str[HEADERBUFSIZELEN];
     sprintf(size_str, "%d", size);  
     padding(final_string, size_str, HEADERBUFSIZELEN);
+    strcat(final_string, "/");
     strcat(final_string, buf);
     strcpy(buf, final_string);
 }
@@ -360,6 +361,7 @@ int service(int new_fd, cJSON* json){
     char* response;
     // respond properly to the request:
     read_all(new_fd, buf);
+    printf("%s\n", buf);
     response = read_request(&buf[HEADERBUFSIZELEN + 1], json);// act!
     
     attach_buf_size_header(response);

@@ -125,6 +125,7 @@ char* attach_buf_size_header(char* buf){
     char size_str[HEADERBUFSIZELEN];
     sprintf(size_str, "%d", size);  
     padding(final_string, size_str, HEADERBUFSIZELEN);
+    strcat(final_string, "/");
     strcat(final_string, buf);
     strcpy(buf, final_string);
 }
@@ -133,7 +134,7 @@ int send_all(int sockfd, char* buf) {
     int total_sent = 0, n;
     int bytes_to_send = strlen(buf);
     int total_to_send = strlen(buf);
-
+    printf("%s\n", buf);
     while(total_sent < total_to_send){
         if ((n = write(sockfd, buf, bytes_to_send)) == -1) {
             perror("send");
