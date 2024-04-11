@@ -362,7 +362,6 @@ int service(int new_fd, cJSON* json){
     char* response;
     // respond properly to the request:
     read_all(new_fd, buf);
-    printf("%s\n", buf);
     response = read_request(buf, json);// act!
     
     attach_buf_size_header(response);
