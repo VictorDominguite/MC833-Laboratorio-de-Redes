@@ -98,16 +98,16 @@ char* read_request(char *request,  cJSON *json){
     char literal_name[MAXSUBSECTIONLEN];
     char* response = (char*)malloc(MAXBUFLEN);
     int n = cJSON_GetArraySize(json);
-
-    switch (request[0])
+    int offset = HEADERBUFSIZELEN + 3;
+    switch (request[HEADERBUFSIZELEN+1])
     {
     case '0':
-        strcpy(response, "0");
+        strcpy(response, "1");
         break;
     case '1':
         //1. Register a new song
         // returns 0/1 if failed/succeded
-        cJSON* song = read_json_string(2+request);
+        cJSON* song = read_json_string(offset+request);
         for (int i = 0; i < n; i++) {
             elem = cJSON_GetArrayItem(json, i);
             id_fetched = cJSON_GetObjectItem(elem, "ID");
@@ -124,7 +124,7 @@ char* read_request(char *request,  cJSON *json){
         //2. Delete a song
         // returns 0/1 if failed/succeded
         char id[MAXIDLEN];
-        strcpy(id, 2+request);
+        strcpy(id, offset+request);
         for (int i = 0; i < n; i++) {
             elem = cJSON_GetArrayItem(json, i);
             id_fetched = cJSON_GetObjectItem(elem, "ID");
@@ -140,11 +140,12 @@ char* read_request(char *request,  cJSON *json){
     case '3':
         //3. List all songs from a year
         // returns [song_object, ...] being song_object each of the songs from the year requested 
-        strcpy(year, 2+request);
+        strcpy(year, offset+request);
         for (int i = 0; i < n; i++) {
             elem = cJSON_GetArrayItem(json, i);
             name = cJSON_GetObjectItem(elem, "Release Date");
             if(strcmp(name->valuestring, year) == 0){
+
                 cJSON_AddItemReferenceToArray(songs, elem);
             }
         }
@@ -155,8 +156,8 @@ char* read_request(char *request,  cJSON *json){
         // returns [song_object, ...] being song_object each of the songs from the year and language requested  
         char language[MAXSUBSECTIONLEN];
         cJSON *language_fetched;
-        strcpy(language, 7+request);
-        strncpy(year, 2+request, 4);
+        strcpy(language, offset+5+request);
+        strncpy(year, offset+request, 4);
         for (int i = 0; i < n; i++) {
             elem = cJSON_GetArrayItem(json, i);
             name = cJSON_GetObjectItem(elem, "Release Date");
@@ -171,7 +172,7 @@ char* read_request(char *request,  cJSON *json){
         //5. List all songs of a genre
         // returns [song_object, ...] being song_object each of the songs from thegenre requested    
         cJSON *genre_fetched;
-        strcpy(genre, 2+request);
+        strcpy(genre, offset+request);
         for (int i = 0; i < n; i++) {
             elem = cJSON_GetArrayItem(json, i);
             genre_fetched = cJSON_GetObjectItem(elem, "Genre");
@@ -184,7 +185,7 @@ char* read_request(char *request,  cJSON *json){
     case '6':
         //6. List all info from a certain song
         // returns [json object]/[] if the ID exists/does not exist
-        strcpy(literal_name, 2+request);
+        strcpy(literal_name, offset+request);
         for (int i = 0; i < n; i++) {
             elem = cJSON_GetArrayItem(json, i);
             name_fetched = cJSON_GetObjectItem(elem, "ID");
@@ -336,7 +337,7 @@ int read_all(int sockfd, char* response) {
 
     } while(total_received < HEADERBUFSIZELEN);
 
-    // Get the total bytes that are going to be received
+// Get the total bytes that are going to be received
     strncpy(str_total_to_receive, response, HEADERBUFSIZELEN);
     str_total_to_receive[HEADERBUFSIZELEN] = '\0';
     total_to_receive = atoi(response);
@@ -362,13 +363,13 @@ int service(int new_fd, cJSON* json){
     // respond properly to the request:
     read_all(new_fd, buf);
     printf("%s\n", buf);
-    response = read_request(&buf[HEADERBUFSIZELEN + 1], json);// act!
+    response = read_request(buf, json);// act!
     
     attach_buf_size_header(response);
     send_all(new_fd, response);
 
     free(response);
-    if (buf[0] == '0') return 0; // terminate connection
+    if (buf[HEADERBUFSIZELEN+1] == '0') return 0; // terminate connection
     return 1;
 }
 
