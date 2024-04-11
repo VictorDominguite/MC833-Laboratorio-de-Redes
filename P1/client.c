@@ -205,7 +205,6 @@ int service(char *buf, int sockfd) {
         perror("read_all");
         exit(1);
     }
-    printf("received\n");
 
     print_query_results(response+HEADERBUFSIZELEN+1);
 
