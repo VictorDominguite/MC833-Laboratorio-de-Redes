@@ -134,7 +134,6 @@ int send_all(int sockfd, char* buf) {
     int total_sent = 0, n;
     int bytes_to_send = strlen(buf);
     int total_to_send = strlen(buf);
-    printf("%s\n", buf);
     while(total_sent < total_to_send){
         if ((n = write(sockfd, buf, bytes_to_send)) == -1) {
             perror("send");
@@ -154,9 +153,10 @@ int read_all(int sockfd, char* response) {
 
     response[0] = '\0';
 
-    // Get the total bytes that are going to be received
+    // Try reading the whole message, or at least the first bytes to know what is 
+    // the size of the message
     do {
-        if ((numbytes_read = read(sockfd, partial_response, HEADERBUFSIZELEN)) == -1) {
+        if ((numbytes_read = read(sockfd, partial_response, MAXBUFLEN-1)) == -1) {
             perror("read");
             return -1;
         }
@@ -167,11 +167,12 @@ int read_all(int sockfd, char* response) {
 
     } while(total_received < HEADERBUFSIZELEN);
 
+    // Get the total bytes that are going to be received
     strncpy(str_total_to_receive, response, HEADERBUFSIZELEN);
     str_total_to_receive[HEADERBUFSIZELEN] = '\0';
     total_to_receive = atoi(response);
 
-    // Receives the rest of the message
+    // Receives the rest of the message, if there are still any bytes left to read
     while(total_received < total_to_receive) {
         if ((numbytes_read = read(sockfd, partial_response, MAXBUFLEN-1)) == -1) {
             perror("read");
@@ -198,14 +199,15 @@ int service(char *buf, int sockfd) {
         perror("send_all");
         exit(1);
     }
-    
+
     // Receives server response
     if (read_all(sockfd, response) == -1) {
         perror("read_all");
         exit(1);
     }
-    
-    print_query_results(response);
+    printf("received\n");
+
+    print_query_results(response+HEADERBUFSIZELEN+1);
 
     free(response);
 
