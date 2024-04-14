@@ -14,7 +14,6 @@
 #include "cJSON/cJSON.h"
 
 #define MYPORT "3220"    // the port users will be connecting to
-
 #define MAXBUFLEN 10000
 #define MAXIDLEN 5
 #define MAXYEARLEN 5
@@ -22,16 +21,6 @@
 #define MAXCHORUSLEN 200
 #define BACKLOG 10   // how many pending connections queue will hold
 #define HEADERBUFSIZELEN 5
-
-void sigchld_handler(int s)
-{
-    // waitpid() might overwrite errno, so we save and restore it:
-    int saved_errno = errno;
-
-    while(waitpid(-1, NULL, WNOHANG) > 0);
-
-    errno = saved_errno;
-}
 
 cJSON* read_json_string(char* buffer){
     /*
@@ -59,7 +48,7 @@ cJSON* read_json() {
         return NULL; 
     } 
 
-    char buffer[1024]; 
+    char buffer[MAXBUFLEN]; 
     fread(buffer, 1, sizeof(buffer), fp); 
     fclose(fp); 
 

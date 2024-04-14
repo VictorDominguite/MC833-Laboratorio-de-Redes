@@ -8,34 +8,58 @@
 		"Release Date":	"1723"
 	}, {
 		"ID":	"2",
-		"Title":	"Four Seasons - 2",
-		"Artist":	"Antonio Vivaldi",
-		"Language":	"Italian",
-		"Genre":	"Classic",
-		"Chorus":	"No Chorus",
-		"Release Date":	"1723"
+		"Title":	"Jingle Bells",
+		"Artist":	"John Pierpont",
+		"Language":	"English",
+		"Genre":	"Christmas",
+		"Chorus":	"Jingle Bells / Jingle Bells / Jingle All the Way",
+		"Release Date":	"1850"
 	}, {
 		"ID":	"3",
-		"Title":	"Four Seasons3",
-		"Artist":	"Antonio Vivaldi",
-		"Language":	"Italian",
-		"Genre":	"Classic",
-		"Chorus":	"No Chorus",
-		"Release Date":	"1453"
-	}, {
-		"ID":	"10",
-		"Title":	"Tobias",
-		"Artist":	"Tobias",
-		"Language":	"port",
-		"Genre":	"pop-dance",
-		"Chorus":	"sou tobias zorzetto moro no gueto",
-		"Release Date":	"2022"
+		"Title":	"Pra te fazer uma cancao de amor",
+		"Artist":	"Leo Damasio",
+		"Language":	"Portuguese",
+		"Genre":	"Pop Rock",
+		"Chorus":	"Pra te fazer uma cancao de amor x2",
+		"Release Date":	"2013"
 	}, {
 		"ID":	"4",
 		"Title":	"Happy Birthday",
 		"Artist":	"Patty Hill",
 		"Language":	"English",
 		"Genre":	"Birthday Songs",
-		"Chorus":	"Happy birthday to you Happy birthday to you Happy birthday, dear [NAME] Happy birthday to you",
+		"Chorus":	"Happy birthday to you / Happy birthday to you / Happy birthday, dear [NAME] / Happy birthday to you",
 		"Release Date":	"1893"
+	}, {
+		"ID":	"5",
+		"Title":	"Rockin' Robin",
+		"Artist":	"Jimmie Thomas",
+		"Language":	"English",
+		"Genre":	"Rock and Roll",
+		"Chorus":	"Rockin' robin (tweet tweet tweet) / Rock, rock, rockin' robin (Tweet, tweedle-lee-dee) / Blow, rockin' robin / 'Cause we're really gonna rock tonight / (Tweet, tweedle-lee-dee)",
+		"Release Date":	"1958"
+	}, {
+		"ID":	"6",
+		"Title":	"Memphis Blues",
+		"Artist":	"W.C. Handy",
+		"Language":	"English",
+		"Genre":	"Blues",
+		"Chorus":	"No Chorus",
+		"Release Date":	"1912"
+	}, {
+		"ID":	"7",
+		"Title":	"Oslodum",
+		"Artist":	"Gilberto Gil",
+		"Language":	"Portuguese",
+		"Genre":	"MPB",
+		"Chorus":	"Eu vou pra Oslo / Pra sair no Oslodum",
+		"Release Date":	"1998"
+	}, {
+		"ID":	"8",
+		"Title":	"Moonlight Sonata - Movement 1",
+		"Artist":	"Ludwig van Beethoven",
+		"Language":	"German",
+		"Genre":	"Classic",
+		"Chorus":	"No Chorus",
+		"Release Date":	"1802"
 	}]
