@@ -302,7 +302,7 @@ void process_operation(char option, int sockfd) {
     case '5': // Search by genre
         char genre[MAXBUFLEN];
         printf("Type the desired genre: ");
-        scanf("%s", genre);
+        scanf("\n%[^\n]%*c", genre);
         strcat(buf, genre);
 
         service(buf, sockfd);

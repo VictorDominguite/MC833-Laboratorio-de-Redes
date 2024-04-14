@@ -30,4 +30,12 @@
 		"Genre":	"pop-dance",
 		"Chorus":	"sou tobias zorzetto moro no gueto",
 		"Release Date":	"2022"
+	}, {
+		"ID":	"4",
+		"Title":	"Happy Birthday",
+		"Artist":	"Patty Hill",
+		"Language":	"English",
+		"Genre":	"Birthday Songs",
+		"Chorus":	"Happy birthday to you Happy birthday to you Happy birthday, dear [NAME] Happy birthday to you",
+		"Release Date":	"1893"
 	}]
