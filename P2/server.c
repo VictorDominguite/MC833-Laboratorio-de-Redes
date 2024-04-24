@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
+#include <sys/select.h>
 #include <signal.h>
 #include <netdb.h>
 #include "cJSON/cJSON.h"
@@ -21,6 +22,16 @@
 #define MAXCHORUSLEN 200
 #define BACKLOG 10   // how many pending connections queue will hold
 #define HEADERBUFSIZELEN 5
+
+void sigchld_handler(int s)
+{
+    // waitpid() might overwrite errno, so we save and restore it:
+    int saved_errno = errno;
+
+    while(waitpid(-1, NULL, WNOHANG) > 0);
+
+    errno = saved_errno;
+}
 
 cJSON* read_json_string(char* buffer){
     /*
@@ -233,7 +244,7 @@ int server_accept(int sockfd, struct sockaddr_storage their_addr){
     return new_fd;
 }
 
-int create_socket(){
+int create_socket(int type){
     /*
     Creates a new socket and binds it based on server's IP and port determined
 
@@ -243,8 +254,12 @@ int create_socket(){
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; 
+    if (type == 0)
+        hints.ai_socktype = SOCK_STREAM;
+    else
+        hints.ai_socktype = SOCK_DGRAM;
+
     // get full adress from IP and port
     rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo);
     if (rv != 0) {
@@ -361,33 +376,77 @@ int service(int new_fd, cJSON* json){
     return 1;
 }
 
+int max(int first, int second){
+    int m = 0;
+    if (first > m) m = first;
+    if (second > m) m = second;
+    return m;
+}
+
 int main(void){
+    int listenfd, connfd, udpfd, nready, maxfdp1;
     int sockfd, new_fd, keep_connection;
+    fd_set rset;
     struct sockaddr_storage their_addr;
+    struct sigaction sa;
     //creates a first socket and defines all its properties
-    sockfd = create_socket();
+    sockfd = create_socket(0);
     //listen - socket is now open for TCP connections
+
+    int optval = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
     server_listen(sockfd);
+
+    udpfd = create_socket(1);
+    sa.sa_handler = sigchld_handler; // reap all dead processes
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+        perror("sigaction");
+        exit(1);
+    }
+    FD_ZERO(&rset);
+    maxfdp1 = max(sockfd, udpfd) + 1;
     // loop infinetly, everytime that receives somthing in the socket, do some operation
     while(1){
-        //accept new_connection
-        new_fd = server_accept(sockfd, their_addr);
-        if (new_fd == -1) continue;
-        // resolve new_connection in child porcess
-        if (fork() == 0) { 
-            close(sockfd);
-            //gets our server's data
-            while (1)
-            {
-                cJSON *json = read_json();
-                keep_connection = service(new_fd, json);
-                //exit tcp connection on client call or error
-                if (keep_connection == 0) break;
-            }
-            
-            exit(0);
+        FD_SET(sockfd, &rset);
+        FD_SET(udpfd, &rset);
+
+        if ((nready = select(maxfdp1, &rset, NULL, NULL, NULL))<0){
+            if(errno = EINTR) continue;
+            //else err_sys("select error");
         }
-        close(new_fd);
+
+        if (FD_ISSET(sockfd, &rset)){
+            new_fd = server_accept(sockfd, their_addr);
+            if (new_fd == -1) continue;
+            if (fork() == 0) { 
+                        close(sockfd);
+                        //gets our server's data
+                        while (1)
+                        {
+                            cJSON *json = read_json();
+                            keep_connection = service(new_fd, json);
+                            //exit tcp connection on client call or error
+                            if (keep_connection == 0) break;
+                        }
+                        
+                        exit(0);
+                    }
+                    close(new_fd);
+        }
+
+        //if (FD_ISSET(udpfd, &rset)) {
+        //    len = sizeof(cliaddr);
+        //    n = recvfrom (udpfd, mesg, MAXLINE, 0, (SA *) &cliaddr, &len);
+        //   sendto (udpfd, mesg, n, 0, (SA *) &cliaddr, len);
+        //}
+
+        // ----------------------------------
+        //accept new_connection
+        
+        // resolve new_connection in child porcess
+        
     }
     close(sockfd);
     return 0;
