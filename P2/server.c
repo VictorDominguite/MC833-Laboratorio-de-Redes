@@ -417,7 +417,7 @@ int main(void){
             //else err_sys("select error");
         }
 
-        if (FD_ISSET(sockfd, &rset)){
+        else if (FD_ISSET(sockfd, &rset)){
             new_fd = server_accept(sockfd, their_addr);
             if (new_fd == -1) continue;
             if (fork() == 0) { 
@@ -436,16 +436,11 @@ int main(void){
                     close(new_fd);
         }
 
-        //if (FD_ISSET(udpfd, &rset)) {
-        //    len = sizeof(cliaddr);
-        //    n = recvfrom (udpfd, mesg, MAXLINE, 0, (SA *) &cliaddr, &len);
-        //   sendto (udpfd, mesg, n, 0, (SA *) &cliaddr, len);
-        //}
-
-        // ----------------------------------
-        //accept new_connection
-        
-        // resolve new_connection in child porcess
+        else if (FD_ISSET(udpfd, &rset)) {
+            len = sizeof(cliaddr);
+            n = recvfrom (udpfd, mesg, MAXLINE, 0, (SA *) &cliaddr, &len);
+           sendto (udpfd, mesg, n, 0, (SA *) &cliaddr, len);
+        }
         
     }
     close(sockfd);
