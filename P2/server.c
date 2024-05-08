@@ -280,7 +280,7 @@ int create_socket(int type){
     return sockfd;
 }
 
-char* padding(char* final_string, char* s, int size){
+void padding(char* final_string, char* s, int size){
     int pad = size - strlen(s);
     strcpy(final_string, "\0");
     char* pad_item = "0";
@@ -290,7 +290,7 @@ char* padding(char* final_string, char* s, int size){
     strcat(final_string, s);
 }
 
-char* attach_buf_size_header(char* buf){
+void attach_buf_size_header(char* buf){
     char final_string[MAXBUFLEN];
     int size = strlen(buf) + HEADERBUFSIZELEN + 1;
     char size_str[HEADERBUFSIZELEN];
@@ -383,8 +383,32 @@ int max(int first, int second){
     return m;
 }
 
+void read_file(char* ID, char* song_buf){
+    char name[100] = "songs/";
+    strcat(name, ID);
+    strcat(name, ".mp3");
+    printf("%s\n", name);
+    FILE *fp;
+    fp=fopen(name,"rb");
+    FILE *fpw;
+    fpw=fopen("songs/teste.mp3","wb");
+    char buf[100];
+    while (!feof(fp)) {
+ 
+        fread(buf, sizeof(buf)-1, 1, fp);
+        // printf("%s\n", buf);
+        fwrite(buf, sizeof(buf)-1, 1, fpw);
+    }
+    fclose(fpw);
+    fclose(fp);
+}
+
 int main(void){
-    int listenfd, connfd, udpfd, nready, maxfdp1;
+
+    char song_buf[1000000] = "\0";
+    read_file("Gilberto Gil - Oslodum", song_buf);
+
+    int udpfd, nready, maxfdp1;
     int sockfd, new_fd, keep_connection;
     fd_set rset;
     struct sockaddr_storage their_addr;
@@ -437,9 +461,9 @@ int main(void){
         }
 
         else if (FD_ISSET(udpfd, &rset)) {
-            len = sizeof(cliaddr);
-            n = recvfrom (udpfd, mesg, MAXLINE, 0, (SA *) &cliaddr, &len);
-           sendto (udpfd, mesg, n, 0, (SA *) &cliaddr, len);
+            //len = sizeof(cliaddr);
+            //n = recvfrom (udpfd, mesg, MAXLINE, 0, (SA *) &cliaddr, &len);
+            //sendto(udpfd, mesg, n, 0, (SA *) &cliaddr, len);
         }
         
     }

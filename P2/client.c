@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/time.h>
 #include "cJSON/cJSON.h"
 
 #define SERVERPORT "3220"    // the port users will be connecting to
@@ -17,6 +18,7 @@
 #define MAXSUBSECTIONLEN 50
 #define MAXCHORUSLEN 200
 #define HEADERBUFSIZELEN 5
+#define TIMEOUT_SECONDS 3
 
 /* Receives a string corresponding to a json file and converts it to 
  * a cJSON object. The converted json object is returned */
@@ -109,7 +111,7 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-char* padding(char* final_string, char* s, int size){
+void padding(char* final_string, char* s, int size){
     int pad = size - strlen(s);
     strcpy(final_string, "\0");
     char* pad_item = "0";
@@ -119,7 +121,7 @@ char* padding(char* final_string, char* s, int size){
     strcat(final_string, s);
 }
 
-char* attach_buf_size_header(char* buf){
+void attach_buf_size_header(char* buf){
     char final_string[MAXBUFLEN];
     int size = strlen(buf) + HEADERBUFSIZELEN + 1;
     char size_str[HEADERBUFSIZELEN];
@@ -187,6 +189,134 @@ int read_all(int sockfd, char* response) {
     return 0;
 }
 
+/* Sends an UDP message to the server requesting to download a song */
+int request_download(char *buf, char *hostname) {
+    int sockfd;
+    struct addrinfo hints, *servinfo, *p;
+    int rv;
+    int numbytes;
+
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET6; // set to AF_INET to use IPv4
+    hints.ai_socktype = SOCK_DGRAM; // for UDP messages
+
+    if ((rv = getaddrinfo(hostname, SERVERPORT, &hints, &servinfo)) != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+        return 1;
+    }
+
+    // loop through all the results and make a socket to send a 
+    // datagram through UDP
+    for(p = servinfo; p != NULL; p = p->ai_next) {
+        if ((sockfd = socket(p->ai_family, p->ai_socktype,
+                p->ai_protocol)) == -1) {
+            perror("talker: socket");
+            continue;
+        }
+
+        break;
+    }
+
+    if (p == NULL) {
+        fprintf(stderr, "talker: failed to create socket\n");
+        return 2;
+    }
+
+    // Sends the download request to the server via UDP
+    if ((numbytes = sendto(sockfd, buf, strlen(buf), 0,
+             p->ai_addr, p->ai_addrlen)) == -1) {
+        perror("talker: sendto");
+        exit(1);
+    }
+
+    printf("Sent download request to server!\n");
+
+    freeaddrinfo(servinfo);
+
+    close(sockfd);
+
+    return 0;
+}
+
+/* Receives the requested song through UDP and saves it in the
+ * "song" buffer */
+int download_song(char *song) {
+    // This code was mainly based on the code from https://beej.us/guide/bgnet/html/
+    int sockfd;
+    struct addrinfo hints, *servinfo, *p;
+    int rv;
+    int numbytes;
+    struct sockaddr_storage their_addr;
+    socklen_t addr_len;
+    fd_set fds;
+    int n;
+    struct timeval tv;
+
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET6; // set to AF_INET to use IPv4
+    hints.ai_socktype = SOCK_DGRAM; // UDP socket
+    hints.ai_flags = AI_PASSIVE; // use my IP
+
+    if ((rv = getaddrinfo(NULL, SERVERPORT, &hints, &servinfo)) != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+        return 1;
+    }
+
+    // loop through all the results and bind to the first we can
+    for(p = servinfo; p != NULL; p = p->ai_next) {
+        if ((sockfd = socket(p->ai_family, p->ai_socktype,
+                p->ai_protocol)) == -1) {
+            perror("listener: socket");
+            continue;
+        }
+
+        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+            close(sockfd);
+            perror("listener: bind");
+            continue;
+        }
+
+        break;
+    }
+
+    if (p == NULL) {
+        fprintf(stderr, "listener: failed to bind socket\n");
+        return 2;
+    }
+
+    // set up the file descriptor set
+    FD_ZERO(&fds);
+    FD_SET(sockfd, &fds);
+
+    // set up the struct timeval for the timeout
+    tv.tv_sec = TIMEOUT_SECONDS;
+    tv.tv_usec = 0;
+
+    // wait until timeout or data received
+    n = select(sockfd+1, &fds, NULL, NULL, &tv);
+    if (n == 0) return -2; // timeout
+    if (n == -1) return -1; // error
+
+
+    freeaddrinfo(servinfo);
+
+    printf("Downloading song...\n");
+
+    // receives song from server using UDP
+    addr_len = sizeof their_addr;
+    if ((numbytes = recvfrom(sockfd, song, MAXBUFLEN-1 , 0,
+        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+        perror("recvfrom");
+        exit(1);
+    }
+
+    song[numbytes] = '\0';
+
+    close(sockfd);
+
+    printf("Song downloaded! Got %d bytes.\n", numbytes);
+    return numbytes;
+}
 
 /* Sends an operation request through a TCP connection using the
  * socket sockfd, then receives and prints the server response */
@@ -214,7 +344,7 @@ int service(char *buf, int sockfd) {
 }
 
 /* Given an operation code as a char, process the corresponding request */
-void process_operation(char option, int sockfd) {
+void process_operation(char option, int sockfd, char *hostname) {
     char buf[MAXBUFLEN] = {option, '/', '\0'};
     char id[MAXIDLEN];
     char title[MAXSUBSECTIONLEN];
@@ -319,6 +449,15 @@ void process_operation(char option, int sockfd) {
     case '7': // Display information from all songs
         service(buf, sockfd);
         break;
+    
+    case '8': // Download a song
+        char song[MAXBUFLEN];
+        printf("Type the ID of the song: ");
+        scanf("%s", id);
+        strcat(buf, id);
+        request_download(buf, hostname);
+        download_song(song);
+        break;
 
     default:
         printf("\nInvalid operation with code \'%c\'.\n\n", option);
@@ -399,13 +538,14 @@ int main(int argc, char *argv[]) {
             "\t5. List all songs of a genre\n"
             "\t6. List all info from a certain song\n"
             "\t7. List all the information from all songs\n"
+            "\t8. Download a song\n"
             "\t0. Exit program\n"
         );
 
         printf("\nType the number corresponding to the desired option: ");
         scanf(" %c", &option);
 
-        process_operation(option, *sockfd);
+        process_operation(option, *sockfd, argv[1]);
         
         if (option == '0') {
             close_tcp_connection(servinfo, *sockfd);
