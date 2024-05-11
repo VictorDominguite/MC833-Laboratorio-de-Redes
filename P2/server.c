@@ -14,7 +14,7 @@
 #include <netdb.h>
 #include "cJSON/cJSON.h"
 
-#define MYPORT "3220"    // the port users will be connecting to
+#define MYPORT "3221"    // the port users will be connecting to
 #define MAXBUFLEN 10000
 #define MAXIDLEN 5
 #define MAXYEARLEN 5
@@ -253,12 +253,15 @@ int create_socket(int type){
     struct addrinfo hints, *servinfo;
 
     memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
     hints.ai_flags = AI_PASSIVE; 
-    if (type == 0)
+    if (type == 0){
+        hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
-    else
+    }
+    else{
+        hints.ai_family = AF_INET6;
         hints.ai_socktype = SOCK_DGRAM;
+    }
 
     // get full adress from IP and port
     rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo);
@@ -294,6 +297,16 @@ void attach_buf_size_header(char* buf){
     char final_string[MAXBUFLEN];
     int size = strlen(buf) + HEADERBUFSIZELEN + 1;
     char size_str[HEADERBUFSIZELEN];
+    sprintf(size_str, "%d", size);  
+    padding(final_string, size_str, HEADERBUFSIZELEN);
+    strcat(final_string, "/");
+    strcat(final_string, buf);
+    strcpy(buf, final_string);
+}
+
+void attach_number_series_header(char* buf, int size){
+    char final_string[MAXBUFLEN];
+    char size_str[7];
     sprintf(size_str, "%d", size);  
     padding(final_string, size_str, HEADERBUFSIZELEN);
     strcat(final_string, "/");
@@ -404,9 +417,7 @@ void read_file(char* ID, char* song_buf){
 }
 
 int main(void){
-
-    char song_buf[1000000] = "\0";
-    read_file("Gilberto Gil - Oslodum", song_buf);
+    
 
     int udpfd, nready, maxfdp1;
     int sockfd, new_fd, keep_connection;
@@ -434,14 +445,17 @@ int main(void){
     // loop infinetly, everytime that receives somthing in the socket, do some operation
     while(1){
         FD_SET(sockfd, &rset);
-        FD_SET(udpfd, &rset);
-
+        FD_SET(udpfd, &rset);   
+        printf("waiting...\n");
+        printf("udp socket %d\n", udpfd);
+        printf("tcp socket %d\n", sockfd);
+        printf("maxfdp1 %d\n", maxfdp1);
         if ((nready = select(maxfdp1, &rset, NULL, NULL, NULL))<0){
             if(errno = EINTR) continue;
             //else err_sys("select error");
         }
 
-        else if (FD_ISSET(sockfd, &rset)){
+        if (FD_ISSET(sockfd, &rset)){
             new_fd = server_accept(sockfd, their_addr);
             if (new_fd == -1) continue;
             if (fork() == 0) { 
@@ -460,10 +474,31 @@ int main(void){
                     close(new_fd);
         }
 
-        else if (FD_ISSET(udpfd, &rset)) {
-            //len = sizeof(cliaddr);
-            //n = recvfrom (udpfd, mesg, MAXLINE, 0, (SA *) &cliaddr, &len);
-            //sendto(udpfd, mesg, n, 0, (SA *) &cliaddr, len);
+        if (FD_ISSET(udpfd, &rset)) {
+            printf("recebi algo\n");
+            char mesg[MAXBUFLEN];
+            socklen_t len = sizeof(their_addr);
+            
+            recvfrom(udpfd, mesg, MAXBUFLEN, 0, (struct sockaddr *)&their_addr, &len);
+            char name[100] = "songs/";
+
+            strcat(name, mesg+2);
+            strcat(name, ".mp3");
+            printf("%s\n", name);
+            FILE *fp;
+            fp=fopen(name,"rb");
+            char buf[100];
+            char response[MAXBUFLEN];
+            int count = 0;
+            while (!feof(fp)) {
+                fread(buf, sizeof(buf)-1, 1, fp);
+                strcpy(response, buf);
+                attach_number_series_header(response, count);
+                sendto(udpfd, response, 107, 0, (struct sockaddr *)&their_addr, len);
+                response[0] = '\0';
+                count++;
+            }
+            fclose(fp);
         }
         
     }

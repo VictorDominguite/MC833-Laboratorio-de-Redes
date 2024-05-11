@@ -10,8 +10,10 @@
 #include <netdb.h>
 #include <sys/time.h>
 #include "cJSON/cJSON.h"
+#include <sys/stat.h>
 
-#define SERVERPORT "3220"    // the port users will be connecting to
+
+#define SERVERPORT "3221"    // the port users will be connecting to
 #define MAXBUFLEN 10000
 #define MAXIDLEN 5
 #define MAXYEARLEN 5
@@ -19,6 +21,7 @@
 #define MAXCHORUSLEN 200
 #define HEADERBUFSIZELEN 5
 #define TIMEOUT_SECONDS 3
+#define MAXCHUNKS 100000
 
 /* Receives a string corresponding to a json file and converts it to 
  * a cJSON object. The converted json object is returned */
@@ -189,6 +192,7 @@ int read_all(int sockfd, char* response) {
     return 0;
 }
 
+
 /* Sends an UDP message to the server requesting to download a song */
 int request_download(char *buf, char *hostname) {
     int sockfd;
@@ -198,34 +202,42 @@ int request_download(char *buf, char *hostname) {
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET6; // set to AF_INET to use IPv4
-    hints.ai_socktype = SOCK_DGRAM; // for UDP messages
+    hints.ai_socktype = SOCK_DGRAM; // UDP socket
+    hints.ai_flags = AI_PASSIVE; // use my IP
 
     if ((rv = getaddrinfo(hostname, SERVERPORT, &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-        return 1;
+        return -1;
     }
 
-    // loop through all the results and make a socket to send a 
-    // datagram through UDP
+    // loop through all the results and bind to the first we can
     for(p = servinfo; p != NULL; p = p->ai_next) {
         if ((sockfd = socket(p->ai_family, p->ai_socktype,
                 p->ai_protocol)) == -1) {
-            perror("talker: socket");
+            perror("client: socket");
             continue;
         }
+
+        // if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+        //     close(sockfd);
+        //     perror("listener: bind");
+        //     continue;
+        // }
 
         break;
     }
 
     if (p == NULL) {
-        fprintf(stderr, "talker: failed to create socket\n");
-        return 2;
+        fprintf(stderr, "client: failed to create socket\n");
+        return -2;
     }
+
+    if (sockfd < 0) return -1;
 
     // Sends the download request to the server via UDP
     if ((numbytes = sendto(sockfd, buf, strlen(buf), 0,
-             p->ai_addr, p->ai_addrlen)) == -1) {
-        perror("talker: sendto");
+            p->ai_addr, p->ai_addrlen)) == -1) {
+        perror("client: sendto");
         exit(1);
     }
 
@@ -233,56 +245,54 @@ int request_download(char *buf, char *hostname) {
 
     freeaddrinfo(servinfo);
 
-    close(sockfd);
+    return sockfd;
+}
 
+/* Function to determine which song chunk comes first */
+int comp(const void * elem1, const void * elem2) {
+    int i, j;
+    char num1_char[10], num2_char[10];
+    int num1, num2;
+    char *e1 = (char *)elem1, *e2 = (char *)elem2;
+
+    for (i = 0; e1[i] != '/'; i++);
+    for (j = 0; e2[j] != '/'; j++);
+
+    strncpy(num1_char, (char *)elem1, i-1);
+    strncpy(num2_char, (char *)elem2, j-1);
+
+    num1 = atoi(num1_char);
+    num2 = atoi(num2_char);
+
+    if (num1 > num2) return  1;
+    if (num1 < num2) return -1;
     return 0;
 }
 
 /* Receives the requested song through UDP and saves it in the
  * "song" buffer */
-int download_song(char *song) {
+int download_song(int sockfd) {
     // This code was mainly based on the code from https://beej.us/guide/bgnet/html/
-    int sockfd;
-    struct addrinfo hints, *servinfo, *p;
-    int rv;
+    printf("HAHAHAHAHAHAHHAHA\n");
     int numbytes;
     struct sockaddr_storage their_addr;
     socklen_t addr_len;
     fd_set fds;
     int n;
     struct timeval tv;
+    char song_chunk[120];
+    char song_chunks[40000][110];
 
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_INET6; // set to AF_INET to use IPv4
-    hints.ai_socktype = SOCK_DGRAM; // UDP socket
-    hints.ai_flags = AI_PASSIVE; // use my IP
+    if (sockfd < 0) return 0;
 
-    if ((rv = getaddrinfo(NULL, SERVERPORT, &hints, &servinfo)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-        return 1;
+    struct stat st = {0};
+
+    if (stat("./downloads", &st) == -1) {
+        mkdir("./downloads", 0700);
     }
 
-    // loop through all the results and bind to the first we can
-    for(p = servinfo; p != NULL; p = p->ai_next) {
-        if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                p->ai_protocol)) == -1) {
-            perror("listener: socket");
-            continue;
-        }
-
-        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close(sockfd);
-            perror("listener: bind");
-            continue;
-        }
-
-        break;
-    }
-
-    if (p == NULL) {
-        fprintf(stderr, "listener: failed to bind socket\n");
-        return 2;
-    }
+    FILE *fp;
+    fp = fopen("downloads/teste.mp3","wb");
 
     // set up the file descriptor set
     FD_ZERO(&fds);
@@ -292,30 +302,43 @@ int download_song(char *song) {
     tv.tv_sec = TIMEOUT_SECONDS;
     tv.tv_usec = 0;
 
-    // wait until timeout or data received
-    n = select(sockfd+1, &fds, NULL, NULL, &tv);
-    if (n == 0) return -2; // timeout
-    if (n == -1) return -1; // error
-
-
-    freeaddrinfo(servinfo);
-
     printf("Downloading song...\n");
+    
+    int total_bytes = 0, dgrams_received = 0;
 
-    // receives song from server using UDP
-    addr_len = sizeof their_addr;
-    if ((numbytes = recvfrom(sockfd, song, MAXBUFLEN-1 , 0,
-        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-        perror("recvfrom");
-        exit(1);
+    while(1) {
+        // wait until timeout or data received
+        n = select(sockfd+1, &fds, NULL, NULL, &tv);
+        if (n == 0) break; // timeout
+        if (n == -1) return -1; // error
+
+        // receives song from server using UDP
+        addr_len = sizeof their_addr;
+        if ((numbytes = recvfrom(sockfd, song_chunk, MAXBUFLEN-1 , 0,
+            (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+            perror("recvfrom");
+            exit(1);
+        }
+        total_bytes += numbytes;
+        song_chunk[numbytes] = '\0';
+        printf("after receive before write\nreceived %d bytes, song %s\n", numbytes, song_chunk);
+        strcpy(song_chunks[dgrams_received], song_chunk);
+        // fwrite(song_chunk+6, numbytes-1, 1, fp);
+        dgrams_received += 1;
     }
 
-    song[numbytes] = '\0';
+    qsort(song_chunks, dgrams_received, sizeof(*song_chunks), comp);
+
+    for(int i = 0; i < dgrams_received; i++) {
+        // song_chunks[i][6] = '\0';
+        // printf("%s\n", song_chunks[i]);
+        fwrite(song_chunks[i]+6, strlen(song_chunks[i])-7, 1, fp);
+    }
+
+    printf("Song downloaded! Got %d bytes.\n", total_bytes);
 
     close(sockfd);
-
-    printf("Song downloaded! Got %d bytes.\n", numbytes);
-    return numbytes;
+    return total_bytes;
 }
 
 /* Sends an operation request through a TCP connection using the
@@ -451,12 +474,11 @@ void process_operation(char option, int sockfd, char *hostname) {
         break;
     
     case '8': // Download a song
-        char song[MAXBUFLEN];
         printf("Type the ID of the song: ");
         scanf("%s", id);
         strcat(buf, id);
-        request_download(buf, hostname);
-        download_song(song);
+        int udp_socket = request_download(buf, hostname);
+        download_song(udp_socket);
         break;
 
     default:
