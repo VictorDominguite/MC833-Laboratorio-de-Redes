@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 
 
-#define SERVERPORT "3221"    // the port users will be connecting to
+#define SERVERPORT "3220"    // the port users will be connecting to
 #define MAXBUFLEN 10000
 #define MAXIDLEN 5
 #define MAXYEARLEN 5
@@ -269,19 +269,25 @@ int comp(const void * elem1, const void * elem2) {
     return 0;
 }
 
+/* Copies numbytes from source to destination */
+void copy_buffer(char *source, char *destination, int numbytes) {
+    for (int i = 0; i < numbytes; i++) {
+        destination[i] = source[i];
+    }
+}
+
 /* Receives the requested song through UDP and saves it in 
  * a file */
 int download_song(int sockfd) {
     // This code was mainly based on the code from https://beej.us/guide/bgnet/html/
-    printf("HAHAHAHAHAHAHHAHA\n");
-    int numbytes[MAXCHUNKS];
+    int numbytes;
     struct sockaddr_storage their_addr;
     socklen_t addr_len;
     fd_set fds;
     int n;
     struct timeval tv;
-    char song_chunk[120];
-    char song_chunks[40000][110];
+    char song_chunk[60];
+    char song_chunks[80000][60];
 
     if (sockfd < 0) return 0;
 
@@ -306,34 +312,39 @@ int download_song(int sockfd) {
     
     int total_bytes = 0, dgrams_received = 0;
 
+    addr_len = sizeof their_addr;
+
     while(1) {
+        printf("%d ", dgrams_received);
+
         // wait until timeout or data received
         n = select(sockfd+1, &fds, NULL, NULL, &tv);
         if (n == 0) break; // timeout
         if (n == -1) return -1; // error
 
         // receives song from server using UDP
-        addr_len = sizeof their_addr;
-        if ((numbytes[dgrams_received] = recvfrom(sockfd, song_chunk, MAXBUFLEN-1 , 0,
+        if ((numbytes = recvfrom(sockfd, song_chunk, sizeof(song_chunk)-1 , 0,
             (struct sockaddr *)&their_addr, &addr_len)) == -1) {
             perror("recvfrom");
             exit(1);
         }
-        total_bytes += numbytes[dgrams_received];
-        song_chunk[numbytes[dgrams_received]] = '\0';
-        // printf("after receive before write\nreceived %d bytes, song %s\n", numbytes[dgrams_received], song_chunk);
-        strcpy(song_chunks[dgrams_received], song_chunk);
-        // fwrite(song_chunk+6, numbytes[dgrams_received]-1, 1, fp);
+        total_bytes += numbytes;
+        song_chunk[numbytes] = '\0';
+        // printf("after receive before write\nreceived %d bytes, song %s\n", numbytes, song_chunk);
+        fwrite(song_chunk+6, numbytes-8, 1, fp);
+        memcpy(song_chunks[dgrams_received], song_chunk, numbytes);
+        // printf("\nsong_chunk: %s\ncopied: %s\n",song_chunk, song_chunks[dgrams_received]);
         dgrams_received += 1;
     }
+    printf("\nsaí fofo\n");
 
     qsort(song_chunks, dgrams_received, sizeof(*song_chunks), comp);
-    int flag = 0;
-    for(int i = 0; i < 2; i++) {
-        // song_chunks[i][6] = '\0';
-        flag = fwrite(song_chunks[i]+6, 1, numbytes[i]-7, fp);
-        if (!flag) printf("Error writing file\n");
-        printf("%s\n", song_chunks[i]+6);
+    // int flag = 0;
+    for(int i = 0; i < dgrams_received; i++) {
+
+        // flag = fwrite(song_chunks[i]+6, 1, numbytes-8, fp);
+        // if (!flag) printf("Error writing file\n");
+
     }
 
     printf("\nSong downloaded! Got %d bytes.\n\n", total_bytes);

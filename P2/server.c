@@ -14,7 +14,7 @@
 #include <netdb.h>
 #include "cJSON/cJSON.h"
 
-#define MYPORT "3221"    // the port users will be connecting to
+#define MYPORT "3220"    // the port users will be connecting to
 #define MAXBUFLEN 10000
 #define MAXIDLEN 5
 #define MAXYEARLEN 5
@@ -304,14 +304,11 @@ void attach_buf_size_header(char* buf){
     strcpy(buf, final_string);
 }
 
-void attach_number_series_header(char* buf, int size){
-    char final_string[MAXBUFLEN];
-    char size_str[7];
-    sprintf(size_str, "%d", size);  
-    padding(final_string, size_str, HEADERBUFSIZELEN);
+void attach_number_series_header(char* final_string, char* buf, int packet_count) {
+    char count_str[7];
+    sprintf(count_str, "%d", packet_count);
+    padding(final_string, count_str, HEADERBUFSIZELEN);
     strcat(final_string, "/");
-    strcat(final_string, buf);
-    strcpy(buf, final_string);
 }
 
 
@@ -487,18 +484,18 @@ int main(void){
             printf("%s\n", name);
             FILE *fp;
             fp=fopen(name,"rb");
-            char buf[100];
+            char buf[50];
             char response[MAXBUFLEN];
             int count = 0;
             while (!feof(fp)) {
                 fread(buf, sizeof(buf)-1, 1, fp);
-                strcpy(response, buf);
-                attach_number_series_header(response, count);
-                sendto(udpfd, response, 107, 0, (struct sockaddr *)&their_addr, len);
-                response[0] = '\0';
+                attach_number_series_header(response, buf, count);
+                memcpy(response+6, buf, sizeof(buf));
+                sendto(udpfd, response, 57, 0, (struct sockaddr *)&their_addr, len);
+                response[0] = '\0';             
                 count++;
             }
-            fclose(fp);
+            fclose(fp);  
         }
         
     }
