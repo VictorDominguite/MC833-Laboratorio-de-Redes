@@ -321,7 +321,7 @@ int download_song(int sockfd) {
         }
         total_bytes += numbytes;
         song_chunk[numbytes] = '\0';
-        printf("after receive before write\nreceived %d bytes, song %s\n", numbytes, song_chunk);
+        // printf("after receive before write\nreceived %d bytes, song %s\n", numbytes, song_chunk);
         strcpy(song_chunks[dgrams_received], song_chunk);
         // fwrite(song_chunk+6, numbytes-1, 1, fp);
         dgrams_received += 1;
@@ -329,13 +329,13 @@ int download_song(int sockfd) {
 
     qsort(song_chunks, dgrams_received, sizeof(*song_chunks), comp);
 
-    for(int i = 0; i < dgrams_received; i++) {
+    for(int i = 0; i < 100; i++) {
         // song_chunks[i][6] = '\0';
-        // printf("%s\n", song_chunks[i]);
-        fwrite(song_chunks[i]+6, strlen(song_chunks[i])-7, 1, fp);
+        printf("%s", song_chunks[i]);
+        fwrite(song_chunks[i]+6, strlen(song_chunks[i])-6, 1, fp);
     }
 
-    printf("Song downloaded! Got %d bytes.\n", total_bytes);
+    printf("\nSong downloaded! Got %d bytes.\n\n", total_bytes);
 
     close(sockfd);
     return total_bytes;
