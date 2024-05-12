@@ -269,12 +269,12 @@ int comp(const void * elem1, const void * elem2) {
     return 0;
 }
 
-/* Receives the requested song through UDP and saves it in the
- * "song" buffer */
+/* Receives the requested song through UDP and saves it in 
+ * a file */
 int download_song(int sockfd) {
     // This code was mainly based on the code from https://beej.us/guide/bgnet/html/
     printf("HAHAHAHAHAHAHHAHA\n");
-    int numbytes;
+    int numbytes[MAXCHUNKS];
     struct sockaddr_storage their_addr;
     socklen_t addr_len;
     fd_set fds;
@@ -314,29 +314,31 @@ int download_song(int sockfd) {
 
         // receives song from server using UDP
         addr_len = sizeof their_addr;
-        if ((numbytes = recvfrom(sockfd, song_chunk, MAXBUFLEN-1 , 0,
+        if ((numbytes[dgrams_received] = recvfrom(sockfd, song_chunk, MAXBUFLEN-1 , 0,
             (struct sockaddr *)&their_addr, &addr_len)) == -1) {
             perror("recvfrom");
             exit(1);
         }
-        total_bytes += numbytes;
-        song_chunk[numbytes] = '\0';
-        // printf("after receive before write\nreceived %d bytes, song %s\n", numbytes, song_chunk);
+        total_bytes += numbytes[dgrams_received];
+        song_chunk[numbytes[dgrams_received]] = '\0';
+        // printf("after receive before write\nreceived %d bytes, song %s\n", numbytes[dgrams_received], song_chunk);
         strcpy(song_chunks[dgrams_received], song_chunk);
-        // fwrite(song_chunk+6, numbytes-1, 1, fp);
+        // fwrite(song_chunk+6, numbytes[dgrams_received]-1, 1, fp);
         dgrams_received += 1;
     }
 
     qsort(song_chunks, dgrams_received, sizeof(*song_chunks), comp);
-
-    for(int i = 0; i < 100; i++) {
+    int flag = 0;
+    for(int i = 0; i < 2; i++) {
         // song_chunks[i][6] = '\0';
-        printf("%s", song_chunks[i]);
-        fwrite(song_chunks[i]+6, strlen(song_chunks[i])-6, 1, fp);
+        flag = fwrite(song_chunks[i]+6, 1, numbytes[i]-7, fp);
+        if (!flag) printf("Error writing file\n");
+        printf("%s\n", song_chunks[i]+6);
     }
 
     printf("\nSong downloaded! Got %d bytes.\n\n", total_bytes);
-
+    
+    fclose(fp);
     close(sockfd);
     return total_bytes;
 }
