@@ -494,7 +494,7 @@ int main(void){
                 sendto(udpfd, response, 57, 0, (struct sockaddr *)&their_addr, len);
                 response[0] = '\0';             
                 count++;
-                // usleep(50);
+                usleep(10);
             }
             printf("sent %d datagrams\n", count);
             fclose(fp);  
