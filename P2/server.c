@@ -14,7 +14,7 @@
 #include <netdb.h>
 #include "cJSON/cJSON.h"
 
-#define MYPORT "3220"    // the port users will be connecting to
+#define MYPORT "3221"    // the port users will be connecting to
 #define MAXBUFLEN 10000
 #define MAXIDLEN 5
 #define MAXYEARLEN 5
@@ -494,7 +494,9 @@ int main(void){
                 sendto(udpfd, response, 57, 0, (struct sockaddr *)&their_addr, len);
                 response[0] = '\0';             
                 count++;
+                // usleep(50);
             }
+            printf("sent %d datagrams\n", count);
             fclose(fp);  
         }
         

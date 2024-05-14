@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 
 
-#define SERVERPORT "3220"    // the port users will be connecting to
+#define SERVERPORT "3221"    // the port users will be connecting to
 #define MAXBUFLEN 10000
 #define MAXIDLEN 5
 #define MAXYEARLEN 5
@@ -258,8 +258,8 @@ int comp(const void * elem1, const void * elem2) {
     for (i = 0; e1[i] != '/'; i++);
     for (j = 0; e2[j] != '/'; j++);
 
-    strncpy(num1_char, (char *)elem1, i-1);
-    strncpy(num2_char, (char *)elem2, j-1);
+    strncpy(num1_char, (char *)elem1, i);
+    strncpy(num2_char, (char *)elem2, j);
 
     num1 = atoi(num1_char);
     num2 = atoi(num2_char);
@@ -304,9 +304,6 @@ int download_song(int sockfd) {
     FD_ZERO(&fds);
     FD_SET(sockfd, &fds);
 
-    // set up the struct timeval for the timeout
-    tv.tv_sec = TIMEOUT_SECONDS;
-    tv.tv_usec = 0;
 
     printf("Downloading song...\n");
     
@@ -315,8 +312,9 @@ int download_song(int sockfd) {
     addr_len = sizeof their_addr;
 
     while(1) {
-        printf("%d ", dgrams_received);
-
+        // set up the struct timeval for the timeout
+        tv.tv_sec = TIMEOUT_SECONDS;
+        tv.tv_usec = 0;
         // wait until timeout or data received
         n = select(sockfd+1, &fds, NULL, NULL, &tv);
         if (n == 0) break; // timeout
@@ -336,7 +334,7 @@ int download_song(int sockfd) {
         // printf("\nsong_chunk: %s\ncopied: %s\n",song_chunk, song_chunks[dgrams_received]);
         dgrams_received += 1;
     }
-    printf("\nsaí fofo\n");
+    printf("\nsaí fofo\nreceived %d datagrams\n", dgrams_received);
 
     qsort(song_chunks, dgrams_received, sizeof(*song_chunks), comp);
     // int flag = 0;
