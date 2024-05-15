@@ -337,19 +337,19 @@ int download_song(int sockfd) {
         }
         
         // printf("after receive before write\nreceived %d bytes, song %s\n", numbytes, song_chunk);
-        fwrite(song_chunk+6, numbytes-8, 1, fp);
+        // fwrite(song_chunk+6, numbytes-8, 1, fp);
         memcpy(song_chunks[dgrams_received], song_chunk, numbytes);
         // printf("\nsong_chunk: %s\ncopied: %s\n",song_chunk, song_chunks[dgrams_received]);
         dgrams_received += 1;
     }
-    printf("\nsaí fofo\nreceived %d datagrams\n", dgrams_received);
+    printf("\nreceived %d datagrams\n", dgrams_received);
 
     qsort(song_chunks, dgrams_received, sizeof(*song_chunks), comp);
-    // int flag = 0;
+    int flag = 0;
     for(int i = 0; i < dgrams_received; i++) {
 
-        // flag = fwrite(song_chunks[i]+6, 1, numbytes-8, fp);
-        // if (!flag) printf("Error writing file\n");
+        flag = fwrite(song_chunks[i]+6, 1, numbytes-8, fp);
+        if (!flag) printf("Error writing file\n");
 
     }
 
