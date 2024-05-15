@@ -22,6 +22,7 @@
 #define HEADERBUFSIZELEN 5
 #define TIMEOUT_SECONDS 3
 #define MAXCHUNKS 100000
+#define ENDOFTRANSMISSION "EEEEE"
 
 /* Receives a string corresponding to a json file and converts it to 
  * a cJSON object. The converted json object is returned */
@@ -288,6 +289,7 @@ int download_song(int sockfd) {
     struct timeval tv;
     char song_chunk[60];
     char song_chunks[80000][60];
+    char header[7];
 
     if (sockfd < 0) return 0;
 
@@ -328,6 +330,12 @@ int download_song(int sockfd) {
         }
         total_bytes += numbytes;
         song_chunk[numbytes] = '\0';
+
+        strncpy(header, song_chunk, 5);
+        if (strcmp(header, ENDOFTRANSMISSION) == 0) {
+            break;
+        }
+        
         // printf("after receive before write\nreceived %d bytes, song %s\n", numbytes, song_chunk);
         fwrite(song_chunk+6, numbytes-8, 1, fp);
         memcpy(song_chunks[dgrams_received], song_chunk, numbytes);
