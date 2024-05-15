@@ -271,7 +271,7 @@ int create_socket(int type){
         hints.ai_socktype = SOCK_STREAM;
     }
     else{
-        hints.ai_family = AF_INET6;
+        hints.ai_family = AF_INET;
         hints.ai_socktype = SOCK_DGRAM;
     }
 
