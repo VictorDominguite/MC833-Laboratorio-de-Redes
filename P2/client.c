@@ -9,8 +9,9 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/time.h>
-#include "cJSON/cJSON.h"
 #include <sys/stat.h>
+#include <ctype.h>
+#include "cJSON/cJSON.h"
 
 
 #define SERVERPORT "3221"    // the port users will be connecting to
@@ -22,7 +23,7 @@
 #define HEADERBUFSIZELEN 5
 #define TIMEOUT_SECONDS 3
 #define MAXCHUNKS 100000
-#define ENDOFTRANSMISSION "EEEEE"
+#define PACKAGESIZE 57
 
 /* Receives a string corresponding to a json file and converts it to 
  * a cJSON object. The converted json object is returned */
@@ -277,6 +278,17 @@ void copy_buffer(char *source, char *destination, int numbytes) {
     }
 }
 
+/* Returns 1 if str is a number or 0 otherwise */
+int isnumerical(char *str) {
+    int len = strlen(str);
+    for (int i = 0; i < len; i++) {
+        if (!isdigit(str[i])) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 /* Receives the requested song through UDP and saves it in 
  * a file */
 int download_song(int sockfd) {
@@ -289,7 +301,8 @@ int download_song(int sockfd) {
     struct timeval tv;
     char song_chunk[60];
     char song_chunks[80000][60];
-    char header[7];
+    char fsize_str[20];
+    int fsize;
 
     if (sockfd < 0) return 0;
 
@@ -313,13 +326,33 @@ int download_song(int sockfd) {
 
     addr_len = sizeof their_addr;
 
-    while(1) {
+    // Expects to receive file size
+    if ((numbytes = recvfrom(sockfd, fsize_str, sizeof(fsize_str)-1 , 0,
+            (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+            perror("recvfrom");
+            exit(1);
+    }
+
+    fsize_str[numbytes] = '\0';
+    
+    if (!isnumerical(fsize_str)) {
+        printf("Error getting file size\n");
+        return -1;
+    }
+
+    fsize = atoi(fsize_str);
+    
+    // Receives the song's content
+    while(total_bytes < fsize) {
         // set up the struct timeval for the timeout
         tv.tv_sec = TIMEOUT_SECONDS;
         tv.tv_usec = 0;
         // wait until timeout or data received
         n = select(sockfd+1, &fds, NULL, NULL, &tv);
-        if (n == 0) break; // timeout
+        if (n == 0) {
+            printf("Timeout while downloading\n");
+            break;
+        } // timeout
         if (n == -1) return -1; // error
 
         // receives song from server using UDP
@@ -328,14 +361,10 @@ int download_song(int sockfd) {
             perror("recvfrom");
             exit(1);
         }
-        total_bytes += numbytes;
-        song_chunk[numbytes] = '\0';
-
-        strncpy(header, song_chunk, 5);
-        if (strcmp(header, ENDOFTRANSMISSION) == 0) {
-            break;
-        }
         
+        song_chunk[numbytes] = '\0';
+        total_bytes += numbytes - 8;
+
         // printf("after receive before write\nreceived %d bytes, song %s\n", numbytes, song_chunk);
         // fwrite(song_chunk+6, numbytes-8, 1, fp);
         memcpy(song_chunks[dgrams_received], song_chunk, numbytes);
@@ -348,7 +377,7 @@ int download_song(int sockfd) {
     int flag = 0;
     for(int i = 0; i < dgrams_received; i++) {
 
-        flag = fwrite(song_chunks[i]+6, 1, numbytes-8, fp);
+        flag = fwrite(song_chunks[i]+6, 1, PACKAGESIZE-8, fp);
         if (!flag) printf("Error writing file\n");
 
     }

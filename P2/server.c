@@ -12,6 +12,7 @@
 #include <sys/select.h>
 #include <signal.h>
 #include <netdb.h>
+#include <sys/stat.h>
 #include "cJSON/cJSON.h"
 
 #define MYPORT "3221"    // the port users will be connecting to
@@ -81,7 +82,18 @@ void write_json(cJSON* json) {
    fputs(json_str, fp); 
    fclose(fp); 
 }
-    
+
+off_t get_file_size(const char *path) {
+    struct stat st;
+
+    if (stat(path, &st) == 0)
+        return st.st_size;
+
+    fprintf(stderr, "Error getting file size\n");
+
+    return -1;
+}
+
 char* read_request(char *request,  cJSON *json){
     /*
         reads received request and returns a response buffer.
@@ -487,6 +499,14 @@ int main(void){
             char buf[50];
             char response[MAXBUFLEN];
             int count = 0;
+
+            // Sends file size to client
+            int fsize = get_file_size(name);
+            sprintf(buf, "%d", fsize);
+            sendto(udpfd, buf, strlen(buf), 0, (struct sockaddr *)&their_addr, len);
+            usleep(10);
+
+            // Sends song to client
             while (!feof(fp)) {
                 fread(buf, sizeof(buf)-1, 1, fp);
                 attach_number_series_header(response, buf, count);
@@ -496,7 +516,6 @@ int main(void){
                 count++;
                 usleep(10);
             }
-            sendto(udpfd, "EEEEE", 6, 0, (struct sockaddr *)&their_addr, len);
             printf("sent %d datagrams\n", count);
             fclose(fp);  
         }
