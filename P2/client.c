@@ -24,6 +24,7 @@
 #define TIMEOUT_SECONDS 3
 #define MAXCHUNKS 100000
 #define PACKAGESIZE 57
+#define UDPHEADERSIZE 8
 
 /* Receives a string corresponding to a json file and converts it to 
  * a cJSON object. The converted json object is returned */
@@ -291,7 +292,7 @@ int isnumerical(char *str) {
 
 /* Receives the requested song through UDP and saves it in 
  * a file */
-int download_song(int sockfd) {
+int download_song(int sockfd, char* song_id) {
     // This code was mainly based on the code from https://beej.us/guide/bgnet/html/
     int numbytes;
     struct sockaddr_storage their_addr;
@@ -302,6 +303,7 @@ int download_song(int sockfd) {
     char song_chunk[60];
     char song_chunks[80000][60];
     char fsize_str[20];
+    char file_path[100];
     int fsize;
 
     if (sockfd < 0) return 0;
@@ -312,8 +314,9 @@ int download_song(int sockfd) {
         mkdir("./downloads", 0700);
     }
 
+    sprintf(file_path, "downloads/%s.mp3", song_id);
     FILE *fp;
-    fp = fopen("downloads/teste.mp3","wb");
+    fp = fopen(file_path,"wb");
 
     // set up the file descriptor set
     FD_ZERO(&fds);
@@ -336,7 +339,7 @@ int download_song(int sockfd) {
     fsize_str[numbytes] = '\0';
     
     if (!isnumerical(fsize_str)) {
-        printf("Error getting file size\n");
+        printf("Error getting file size. Please, try again.\n");
         return -1;
     }
 
@@ -363,26 +366,24 @@ int download_song(int sockfd) {
         }
         
         song_chunk[numbytes] = '\0';
-        total_bytes += numbytes - 8;
+        total_bytes += numbytes - UDPHEADERSIZE;
 
-        // printf("after receive before write\nreceived %d bytes, song %s\n", numbytes, song_chunk);
-        // fwrite(song_chunk+6, numbytes-8, 1, fp);
         memcpy(song_chunks[dgrams_received], song_chunk, numbytes);
-        // printf("\nsong_chunk: %s\ncopied: %s\n",song_chunk, song_chunks[dgrams_received]);
+
         dgrams_received += 1;
     }
-    printf("\nreceived %d datagrams\n", dgrams_received);
+    printf("\nReceived %d datagrams\n", dgrams_received);
 
     qsort(song_chunks, dgrams_received, sizeof(*song_chunks), comp);
     int flag = 0;
     for(int i = 0; i < dgrams_received; i++) {
 
-        flag = fwrite(song_chunks[i]+6, 1, PACKAGESIZE-8, fp);
+        flag = fwrite(song_chunks[i]+UDPHEADERSIZE-2, 1, PACKAGESIZE-UDPHEADERSIZE, fp);
         if (!flag) printf("Error writing file\n");
 
     }
 
-    printf("\nSong downloaded! Got %d bytes.\n\n", total_bytes);
+    printf("\nSong downloaded! Got %d bytes. Saved to %s.\n\n", total_bytes, file_path);
     
     fclose(fp);
     close(sockfd);
@@ -526,7 +527,7 @@ void process_operation(char option, int sockfd, char *hostname) {
         scanf("%s", id);
         strcat(buf, id);
         int udp_socket = request_download(buf, hostname);
-        download_song(udp_socket);
+        download_song(udp_socket, id);
         break;
 
     default:

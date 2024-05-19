@@ -219,18 +219,6 @@ char* read_request(char *request,  cJSON *json){
     return response;
 }
 
-void *get_in_addr(struct sockaddr *sa)
-    /*
-        get sockaddr
-    */
-{
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
-
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
-}
-
 void server_listen(int sockfd){
     /*
     Announce willingness to accept connections, give queue size
@@ -284,8 +272,14 @@ int create_socket(int type){
     //create socket
     sockfd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
     if (sockfd == -1) perror("server: socket");
+
+    //FIXMEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+    servinfo.sin_family = AF_INET;
+    servinfo.sin_addr.s_addr = htonl(INADDR_ANY);
+    servinfo.sin_port = htons(MYPORT);
+    
     //bind socket with adress
-    rv = bind(sockfd, servinfo->ai_addr, servinfo->ai_addrlen);
+    rv = bind(sockfd, d->ai_addr, servinfo->ai_addrlen);
     if (rv == -1) {
         close(sockfd);
         perror("server: bind");
@@ -425,6 +419,49 @@ void read_file(char* ID, char* song_buf){
     fclose(fp);
 }
 
+void build_song_path(char* name, char* msg){
+    strcat(name, msg+2);
+    strcat(name, ".mp3");
+}
+
+void send_song(int udpfd){
+    FILE *fp;
+    char buf[50];
+    char name[100] = "songs/";
+    char mesg[MAXBUFLEN];
+    char response[MAXBUFLEN];
+    struct sockaddr_storage their_addr;
+
+    socklen_t len = sizeof(their_addr);
+    
+    recvfrom(udpfd, mesg, MAXBUFLEN, 0, (struct sockaddr *)&their_addr, &len);
+
+    // get song file
+    build_song_path(name, mesg);
+    printf("Sending %s\n", name);
+    fp=fopen(name,"rb");
+
+    // Sends file size to client
+    int fsize = get_file_size(name);
+    sprintf(buf, "%d", fsize);
+    sendto(udpfd, buf, strlen(buf), 0, (struct sockaddr *)&their_addr, len);
+    usleep(10);
+
+    // Sends song to client
+    int count = 0;
+    while (!feof(fp)) {
+        fread(buf, sizeof(buf)-1, 1, fp);
+        attach_number_series_header(response, buf, count);
+        memcpy(response+6, buf, sizeof(buf));
+        sendto(udpfd, response, 57, 0, (struct sockaddr *)&their_addr, len);
+        response[0] = '\0';             
+        count++;
+        usleep(10);
+    }
+    printf("Sent %d datagrams\n", count);
+    fclose(fp);
+}
+
 int main(void){
     
 
@@ -456,9 +493,7 @@ int main(void){
         FD_SET(sockfd, &rset);
         FD_SET(udpfd, &rset);   
         printf("waiting...\n");
-        printf("udp socket %d\n", udpfd);
-        printf("tcp socket %d\n", sockfd);
-        printf("maxfdp1 %d\n", maxfdp1);
+
         if ((nready = select(maxfdp1, &rset, NULL, NULL, NULL))<0){
             if(errno = EINTR) continue;
             //else err_sys("select error");
@@ -482,42 +517,9 @@ int main(void){
                     }
                     close(new_fd);
         }
-
+        // If receives UDP, than it is asking for a song to download
         if (FD_ISSET(udpfd, &rset)) {
-            printf("recebi algo\n");
-            char mesg[MAXBUFLEN];
-            socklen_t len = sizeof(their_addr);
-            
-            recvfrom(udpfd, mesg, MAXBUFLEN, 0, (struct sockaddr *)&their_addr, &len);
-            char name[100] = "songs/";
-
-            strcat(name, mesg+2);
-            strcat(name, ".mp3");
-            printf("%s\n", name);
-            FILE *fp;
-            fp=fopen(name,"rb");
-            char buf[50];
-            char response[MAXBUFLEN];
-            int count = 0;
-
-            // Sends file size to client
-            int fsize = get_file_size(name);
-            sprintf(buf, "%d", fsize);
-            sendto(udpfd, buf, strlen(buf), 0, (struct sockaddr *)&their_addr, len);
-            usleep(10);
-
-            // Sends song to client
-            while (!feof(fp)) {
-                fread(buf, sizeof(buf)-1, 1, fp);
-                attach_number_series_header(response, buf, count);
-                memcpy(response+6, buf, sizeof(buf));
-                sendto(udpfd, response, 57, 0, (struct sockaddr *)&their_addr, len);
-                response[0] = '\0';             
-                count++;
-                usleep(10);
-            }
-            printf("sent %d datagrams\n", count);
-            fclose(fp);  
+            send_song(udpfd);
         }
         
     }
