@@ -15,7 +15,7 @@
 #include <sys/stat.h>
 #include "cJSON/cJSON.h"
 
-#define MYPORT "3221"    // the port users will be connecting to
+#define MYPORT "3220"    // the port users will be connecting to
 #define MAXBUFLEN 10000
 #define MAXIDLEN 5
 #define MAXYEARLEN 5
@@ -23,6 +23,7 @@
 #define MAXCHORUSLEN 200
 #define BACKLOG 10   // how many pending connections queue will hold
 #define HEADERBUFSIZELEN 5
+#define PACKAGESIZE 57
 
 void sigchld_handler(int s)
 {
@@ -272,11 +273,6 @@ int create_socket(int type){
     //create socket
     sockfd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
     if (sockfd == -1) perror("server: socket");
-
-    //FIXMEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
-    // servinfo->sin_family = AF_INET;
-    // servinfo->sin_addr.s_addr = htonl(INADDR_ANY);
-    // servinfo->sin_port = htons(atoi(MYPORT));
     
     //bind socket with adress
     rv = bind(sockfd, servinfo->ai_addr, servinfo->ai_addrlen);

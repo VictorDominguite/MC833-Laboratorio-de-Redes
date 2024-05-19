@@ -14,7 +14,7 @@
 #include "cJSON/cJSON.h"
 
 
-#define SERVERPORT "3221"    // the port users will be connecting to
+#define SERVERPORT "3220"    // the port users will be connecting to
 #define MAXBUFLEN 10000
 #define MAXIDLEN 5
 #define MAXYEARLEN 5
@@ -22,9 +22,10 @@
 #define MAXCHORUSLEN 200
 #define HEADERBUFSIZELEN 5
 #define TIMEOUT_SECONDS 3
-#define MAXCHUNKS 100000
+#define MAXCHUNKS 130000
 #define PACKAGESIZE 57
 #define UDPHEADERSIZE 8
+#define MAXDATAGRAMS 100000
 
 /* Receives a string corresponding to a json file and converts it to 
  * a cJSON object. The converted json object is returned */
@@ -221,12 +222,6 @@ int request_download(char *buf, char *hostname) {
             continue;
         }
 
-        // if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-        //     close(sockfd);
-        //     perror("listener: bind");
-        //     continue;
-        // }
-
         break;
     }
 
@@ -300,8 +295,8 @@ int download_song(int sockfd, char* song_id) {
     fd_set fds;
     int n;
     struct timeval tv;
-    char song_chunk[60];
-    char song_chunks[130000][60];
+    char song_chunk[PACKAGESIZE];
+    char song_chunks[MAXCHUNKS][PACKAGESIZE];
     char fsize_str[20];
     char file_path[100];
     int fsize;
@@ -346,7 +341,7 @@ int download_song(int sockfd, char* song_id) {
     fsize = atoi(fsize_str);
     
     // Receives the song's content
-    while(total_bytes < fsize) {
+    while(total_bytes < fsize && dgrams_received < MAXCHUNKS) {
         // set up the struct timeval for the timeout
         tv.tv_sec = TIMEOUT_SECONDS;
         tv.tv_usec = 0;
@@ -366,7 +361,7 @@ int download_song(int sockfd, char* song_id) {
         }
         
         song_chunk[numbytes] = '\0';
-        total_bytes += numbytes - UDPHEADERSIZE;
+        total_bytes += numbytes - (UDPHEADERSIZE-1);
 
         memcpy(song_chunks[dgrams_received], song_chunk, numbytes);
 
@@ -527,6 +522,10 @@ void process_operation(char option, int sockfd, char *hostname) {
     case '8': // Download a song
         printf("Type the ID of the song: ");
         scanf("%s", id);
+        while(!isnumerical(id)) {
+            printf("Invalid ID. Type the ID of the song: ");
+            scanf("%s", id);
+        }
         strcat(buf, id);
         int udp_socket = request_download(buf, hostname);
         download_song(udp_socket, id);
