@@ -274,12 +274,12 @@ int create_socket(int type){
     if (sockfd == -1) perror("server: socket");
 
     //FIXMEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
-    servinfo.sin_family = AF_INET;
-    servinfo.sin_addr.s_addr = htonl(INADDR_ANY);
-    servinfo.sin_port = htons(MYPORT);
+    // servinfo->sin_family = AF_INET;
+    // servinfo->sin_addr.s_addr = htonl(INADDR_ANY);
+    // servinfo->sin_port = htons(atoi(MYPORT));
     
     //bind socket with adress
-    rv = bind(sockfd, d->ai_addr, servinfo->ai_addrlen);
+    rv = bind(sockfd, servinfo->ai_addr, servinfo->ai_addrlen);
     if (rv == -1) {
         close(sockfd);
         perror("server: bind");

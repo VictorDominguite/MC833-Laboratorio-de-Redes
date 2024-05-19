@@ -301,7 +301,7 @@ int download_song(int sockfd, char* song_id) {
     int n;
     struct timeval tv;
     char song_chunk[60];
-    char song_chunks[80000][60];
+    char song_chunks[130000][60];
     char fsize_str[20];
     char file_path[100];
     int fsize;
@@ -374,7 +374,9 @@ int download_song(int sockfd, char* song_id) {
     }
     printf("\nReceived %d datagrams\n", dgrams_received);
 
-    qsort(song_chunks, dgrams_received, sizeof(*song_chunks), comp);
+    if (dgrams_received < 80000)
+        qsort(song_chunks, dgrams_received, sizeof(*song_chunks), comp);
+
     int flag = 0;
     for(int i = 0; i < dgrams_received; i++) {
 
