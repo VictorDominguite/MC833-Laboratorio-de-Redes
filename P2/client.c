@@ -523,7 +523,7 @@ void process_operation(char option, int sockfd, char *hostname) {
         printf("Type the ID of the song: ");
         scanf("%s", id);
         while(!isnumerical(id)) {
-            printf("Invalid ID. Type the ID of the song: ");
+            printf("Invalid ID.\nType the ID of the song: ");
             scanf("%s", id);
         }
         strcat(buf, id);
