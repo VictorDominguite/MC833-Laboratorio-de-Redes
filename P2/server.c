@@ -434,8 +434,11 @@ void send_song(int udpfd){
 
     // get song file
     build_song_path(name, mesg);
-    printf("Sending %s\n", name);
+    
     fp=fopen(name,"rb");
+    if (!fp) return;
+
+    printf("Sending %s\n", name);
 
     // Sends file size to client
     int fsize = get_file_size(name);

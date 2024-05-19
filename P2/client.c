@@ -310,19 +310,28 @@ int download_song(int sockfd, char* song_id) {
     }
 
     sprintf(file_path, "downloads/%s.mp3", song_id);
-    FILE *fp;
-    fp = fopen(file_path,"wb");
 
     // set up the file descriptor set
     FD_ZERO(&fds);
     FD_SET(sockfd, &fds);
-
-
-    printf("Downloading song...\n");
     
     int total_bytes = 0, dgrams_received = 0;
 
     addr_len = sizeof their_addr;
+
+    tv.tv_sec = TIMEOUT_SECONDS;
+    tv.tv_usec = 0;
+    // wait until timeout or data received
+    n = select(sockfd+1, &fds, NULL, NULL, &tv);
+    if (n == 0) {
+        printf("\nTimed out. Please try again. (ID might be invalid).\n\n");
+        return -1;
+    } // timeout
+
+    FILE *fp;
+    fp = fopen(file_path,"wb");
+
+    printf("Downloading song...\n");
 
     // Expects to receive file size
     if ((numbytes = recvfrom(sockfd, fsize_str, sizeof(fsize_str)-1 , 0,
