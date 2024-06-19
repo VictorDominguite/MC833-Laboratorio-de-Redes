@@ -42,6 +42,7 @@ def get_source_destination_ips(packets):
         
 
 def get_mean_interval(timestamps):
+    timestamps.sort()
     prev_time = timestamps[0]
     intervals = []
     for time in timestamps[1:]:
